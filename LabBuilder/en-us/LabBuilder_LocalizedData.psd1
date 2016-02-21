@@ -1,5 +1,9 @@
 # culture="en-US"
 ConvertFrom-StringData -StringData @'
+    FileNotFoundError=The {0} file '{1}' was not found.
+    InitializeVHDNotInitializedError=The VHD '{0}' failed to initialize because a Partition Style was not provided.
+    InitializeVHDNotFormattedError=The VHD '{0}' failed to format because a File System was not provided.
+    InitializeVHDAccessPathNotFoundError=The VHD '{0}' could not be assigned to the access path '{1}' because it does not exist.
     FileDownloadError=Error downloading {0} from '{1}'; {2}.
     FileExtractError=Error extracting {0}; {1}.
     ConfigurationFileNotFoundError=Configuration file {0} is not found.
@@ -24,8 +28,10 @@ ConvertFrom-StringData -StringData @'
     InvalidVMTemplateVHDVHDTypeError=The VHDType '{1}' in VM template VHD '{0}' is invalid. Valid settings are Dynamic or Fixed.
     InvalidVMTemplateVHDGenerationError=The Generation '{1}' in VM template VHD '{0}' is invalid. Valid settings are 1 or 2.
     EmptyTemplateNameError=Template Name is missing or empty.
-    EmptyTemplateVHDError=VHD in Template '{0}' is empty.
-    TemplateSourceVHDNotFoundError=The Template Source VHD '{0}' in Template '{1}' could not be found.
+    TemplateSourceVHDAndTemplateVHDConflictError=Both the Template SourceVHD and TemplateVHD parameters are set for Template '{0}'. Only one of these may be set for each Template.
+    TemplateSourceVHDandTemplateVHDMissingError=Either the Template SourceVHD or TemplateVHD parameter must be set in Template '{0}'.
+    TemplateTemplateVHDNotFoundError=The Template Template VHD '{1}' in Template '{0}' could not be found.
+    TemplateSourceVHDNotFoundError=The Template Source VHD '{1}' in Template '{0}' could not be found.
     DSCModuleDownloadError=Module '{2}' required by DSC Config File '{0}' in VM '{1}' could not be found or downloaded.					
     DSCModuleNotFoundError=Module '{2}' required by DSC Config File '{0}' in VM '{1}' could not be found in the module path.
     CertificateCreateError=The self-signed certificate for VM '{0}' could not be created and downloaded.
@@ -66,9 +72,21 @@ ConvertFrom-StringData -StringData @'
     VMDataDiskVHDConvertError=The Data Disk '{1}' in VM '{0}' cannot be converted to a {2} type.
     VMDataDiskVHDShrinkError=The Data Disk '{1}' in VM '{0}' cannot be shrunk to {2}.
     DownloadFolderDoesNotExistError=The folder '{0}' to download '{1}' to does not exist.
-
+    VMDataDiskPartitionStyleError='{2}' is not a valid partition style for the Data Disk '{1}' in VM '{0}'.
+    VMDataDiskFileSystemError='{2}' is not a valid file system for the Data Disk '{1}' in VM '{0}'.
+    VMDataDiskPartitionStyleMissingError=The Data Disk '{1}' in VM '{0}' does not have a partition style definied.
+    VMDataDiskFileSystemMissingError=The Data Disk '{1}' in VM '{0}' does not have a file format definied.
+    VMDataDiskCopyFolderMissingError=The CopyFolder '{2}' that should be copied to Data Disk '{1}' in VM '{0}' does not exist.
+    
     InstallingHyperVComponentsMesage=Installing {0} Hyper-V Components.
     InitializingHyperVComponentsMesage=Initializing Hyper-V Components.
+    InitializeVHDMountingMessage=Mounting VHD {0} for Initialization.
+    InitializeVHDInitializingMessage=Initializing {1} partition table on VHD {0}.
+    InitializeVHDCreatePartitionMessage=Creating partition on VHD {0}.
+    InitializeVHDFormatVolumeMessage=Formatting volume on partition {2} as {1} on VHD {0}.
+    InitializeVHDSetLabelVolumeMessage=Setting volume label to {1} on VHD {0}.
+    InitializeVHDDriveLetterMessage=Assigning drive letter {1}: to VHD {0}.
+    InitializeVHDAccessPathMessage=Assigning access path {1} to VHD {0}.
     DownloadingFileMessage=Downloading File '{0}' from '{1}' to '{2}'.
     ExtractingFileMessage=Extracting downloaded File '{0}' to '{1}'.
     DownloadingLabResourcesMessage=Downloading Lab Resources.
@@ -76,21 +94,21 @@ ConvertFrom-StringData -StringData @'
     UpdatingLabManagementSwitchMessage=Updating Lab Management Switch {0} to Vlan {1}.
     ModuleNotInstalledMessage=Module {0} ({1}) is not installed.
     DownloadingLabResourceWebMessage=Downloading Module {0} ({1}) from '{2}'.
-    InstallingLabResourceWebMessage=Installing Module {0} ({1}) to Modules Folder '{2}'.
     InstalledLabResourceWebMessage=Installed Module {0} ({1}) to '{2}'.
     CreatingVirtualSwitchMessage=Creating {0} Virtual Switch '{1}'.
     DeleteingVirtualSwitchMessage=Deleting {0} Virtual Switch '{1}'.
     CopyingTemplateSourceVHDMessage=Copying template source VHD '{0}' to '{1}'.
-    OptimizingTemplateVHDMessage=Optimizing template VHD '{0}'.
-    SettingTemplateVHDReadonlyMessage=Setting template VHD '{0}' as readonly.
-    SkipTemplateVHDFileMessage=Skip copying template VHD file '{1}' for '{0}' because it already exists.
+    OptimizingParentVHDMessage=Optimizing parent VHD '{0}'.
+    SettingParentVHDReadonlyMessage=Setting parent VHD '{0}' as readonly.
+    SkipParentVHDFileMessage=Skip copying parent VHD file '{1}' for '{0}' because it already exists.
     SkipVMTemplateVHDFileMessage=Skip building VM template VHD file '{1}' for '{0}' because it already exists.
-    DeletingTemplateVHDMessage=Deleting Template VHD '{0}'.
+    DeletingParentVHDMessage=Deleting Parent VHD '{0}'.
     DSCConfigIdentifyModulesMessage=Identifying Modules used by DSC Config File '{0}' in VM '{1}'.
     DSCConfigSearchingForModuleMessage=Searching for Module '{2}' required by DSC Config File '{0}' in VM '{1}'.
     DSCConfigInstallingModuleMessage=Installing Module '{2}' required by DSC Config File '{0}' in VM '{1}'.
     DSCConfigSavingModuleMessage=Saving Module '{2}' required by DSC Config File '{0}' in VM '{1}' to LabBuilder files.
     DSCConfigCreatingLCMMOFMessage=Creating DSC LCM Config file '{0}' in VM '{1}'.
+    DSCConfigPrepareMessage=Preparing to compile DSC Config '{0}' for VM '{1}'.
     DSCConfigCreatingMOFMessage=Creating DSC Config file '{0}' in VM '{1}'.
     DSCConfigMOFCreatedMessage=DSC MOF File '{0}' for VM '{1}'. was created successfully.
     ConnectingVMMessage=Connecting to VM '{0}'.
@@ -105,6 +123,10 @@ ConvertFrom-StringData -StringData @'
     VMDiskAlreadyExistsMessage={2} disk '{1}' for VM '{0}' already exists.
     ExpandingVMDiskMessage=Expanding {2} disk '{1}' for VM '{0}' to {3}.
     AddingVMDiskMessage=Adding {2} disk '{1}' to VM '{0}'.
+    CopyingFoldersToVMDiskMessage=Copying folder '{2}' to VM Disk '{1}' for VM '{0}'.
+    InitializingVMDiskMessage=Initializing VM Disk '{1}' for VM '{0}'.
+    MountingVMDiskMessage=Mounting VM Disk '{1}' for VM '{0}' to '{2}'.
+    DismountingVMDiskMessage=Dismounting VM Disk '{1}' for VM '{0}'.
     DeletingVMAllDisksMessage=Deleting all disks from VM '{0}'.
     AddingVMNetworkAdapterMessage=Adding {2} network adapter {1} to VM '{0}'.
     SettingVMNetworkAdapterVlanMessage=Setting VLAN on {2} network adapter {1} in VM '{0}' to {3}.
@@ -137,4 +159,5 @@ ConvertFrom-StringData -StringData @'
     CreatingVMTemplateVHDMessage=Creating the '{0}' VM Template VHD '{1}'.
     ConvertingWIMtoVHDMessage=Converting '{3}' in '{0}' to a bootable {4} {5} {2} '{1}'.
     CreatedVMInitializationFiles=Created Initialization files for VM '{0}'.
+    MountingVMTemplateVHDISOMessage=Mounting {1} to use source WIM to create Template VHD {0}
 '@
