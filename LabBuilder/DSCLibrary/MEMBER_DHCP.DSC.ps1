@@ -1,18 +1,60 @@
-<#########################################################################################################################################
+<###################################################################################################
 DSC Template Configuration File For use by LabBuilder
 .Title
     MEMBER_DHCP
 .Desription
     Builds a Server that is joined to a domain and then made into a DHCP Server.
-.Parameters:          
+.Parameters:
     DomainName = "LABBUILDER.COM"
     DomainAdminPassword = "P@ssword!1"
-#########################################################################################################################################>
+    DCName = 'SA-DC1'
+    PSDscAllowDomainUser = $True
+    Scopes = @(
+        @{ Name = 'Site A Primary';
+            Start = '192.168.128.50';
+            End = '192.168.128.254';
+            SubnetMask = '255.255.255.0';
+            AddressFamily = 'IPv4'
+        }
+    )
+    Reservations = @(
+        @{ Name = 'SA-DC1';
+            ScopeID = '192.168.128.0';
+            ClientMACAddress = '000000000000';
+            IPAddress = '192.168.128.10';
+            AddressFamily = 'IPv4'
+        },
+        @{ Name = 'SA-DC2';
+            ScopeID = '192.168.128.0';
+            ClientMACAddress = '000000000001';
+            IPAddress = '192.168.128.11';
+            AddressFamily = 'IPv4'
+        },
+        @{ Name = 'SA-DHCP1';
+            ScopeID = '192.168.128.0';
+            ClientMACAddress = '000000000002';
+            IPAddress = '192.168.128.16';
+            AddressFamily = 'IPv4'
+        },
+        @{ Name = 'SA-EDGE1';
+            ScopeID = '192.168.128.0';
+            ClientMACAddress = '000000000005';
+            IPAddress = '192.168.128.19';
+            AddressFamily = 'IPv4'
+        }
+    )
+    ScopeOptions = @(
+        @{ ScopeID = '192.168.128.0';
+            DNServerIPAddress = @('192.168.128.10','192.168.128.11');
+            Router = '192.168.128.19';
+            AddressFamily = 'IPv4'
+        }
+    )
+###################################################################################################>
 
 Configuration MEMBER_DHCP
 {
-    Import-DscResource -ModuleName 'PSDesiredStateConfiguration' -ModuleVersion 1.1
-    Import-DscResource -ModuleName xActiveDirectory
+    Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
     Import-DscResource -ModuleName xComputerManagement
     Import-DscResource -ModuleName xDHCPServer
     Node $AllNodes.NodeName {
@@ -30,20 +72,12 @@ Configuration MEMBER_DHCP
             Name = "DHCP" 
         }
 
-        WindowsFeature RSATADPowerShell
-        { 
-            Ensure = "Present" 
-            Name = "RSAT-AD-PowerShell" 
-            DependsOn = "[WindowsFeature]DHCPInstall" 
-        } 
-
-        xWaitForADDomain DscDomainWait
+        WaitForAll DC
         {
-            DomainName = $Node.DomainName
-            DomainUserCredential = $DomainAdminCredential 
-            RetryCount = 100 
-            RetryIntervalSec = 10 
-            DependsOn = "[WindowsFeature]RSATADPowerShell" 
+            ResourceName      = '[xADDomain]PrimaryDC'
+            NodeName          = $Node.DCname
+            RetryIntervalSec  = 15
+            RetryCount        = 60
         }
 
         xComputer JoinDomain 
@@ -51,9 +85,10 @@ Configuration MEMBER_DHCP
             Name          = $Node.NodeName
             DomainName    = $Node.DomainName
             Credential    = $DomainAdminCredential 
-            DependsOn = "[xWaitForADDomain]DscDomainWait" 
-        } 
+            DependsOn     = "[WaitForAll]DC" 
+        }
 
+        # DHCP Server Settings
         Script DHCPAuthorize
         {
             PSDSCRunAsCredential = $DomainAdminCredential
@@ -75,12 +110,12 @@ Configuration MEMBER_DHCP
             $Count++
             xDhcpServerScope "Scope$Count"
             {
-                Ensure = 'Present'
-                IPStartRange = $Scope.Start
-                IPEndRange = $Scope.End
-                Name = $Scope.Name
-                SubnetMask = $Scope.SubnetMask
-                State = 'Active'
+                Ensure        = 'Present'
+                IPStartRange  = $Scope.Start
+                IPEndRange    = $Scope.End
+                Name          = $Scope.Name
+                SubnetMask    = $Scope.SubnetMask
+                State         = 'Active'
                 LeaseDuration = '00:08:00'
                 AddressFamily = $Scope.AddressFamily
             }
@@ -90,12 +125,12 @@ Configuration MEMBER_DHCP
             $Count++
             xDhcpServerReservation "Reservation$Count"
             {
-                Ensure = 'Present'
-                ScopeID = $Reservation.ScopeId
+                Ensure           = 'Present'
+                ScopeID          = $Reservation.ScopeId
                 ClientMACAddress = $Reservation.ClientMACAddress
-                IPAddress = $Reservation.IPAddress
-                Name = $Reservation.Name
-                AddressFamily = $Reservation.AddressFamily
+                IPAddress        = $Reservation.IPAddress
+                Name             = $Reservation.Name
+                AddressFamily    = $Reservation.AddressFamily
             }
         }
         [Int]$Count=0
@@ -103,12 +138,12 @@ Configuration MEMBER_DHCP
             $Count++
             xDhcpServerOption "ScopeOption$Count"
             {
-                Ensure = 'Present'
-                ScopeID = $ScopeOption.ScopeId
-                DnsDomain = $Node.DomainName
+                Ensure             = 'Present'
+                ScopeID            = $ScopeOption.ScopeId
+                DnsDomain          = $Node.DomainName
                 DnsServerIPAddress = $ScopeOption.DNServerIPAddress
-                Router = $ScopeOption.Router
-                AddressFamily = $ScopeOption.AddressFamily
+                Router             = $ScopeOption.Router
+                AddressFamily      = $ScopeOption.AddressFamily
             }
         }
     }

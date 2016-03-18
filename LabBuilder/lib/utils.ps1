@@ -62,23 +62,6 @@ function ThrowException
 
 <#
 .SYNOPSIS
-   Returns True if running as Administrator
-#>
-function IsAdmin()
-{
-    # Get the ID and security principal of the current user account
-    $myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
-    $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
-  
-    # Get the security principal for the Administrator role
-    $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
-  
-    # Check to see if we are currently running "as Administrator"
-    Return ($myWindowsPrincipal.IsInRole($adminRole))
-} # IsAdmin
-
-<#
-.SYNOPSIS
    Download the a file to a folder and optionally unzip it.
    
    If the file is a zip file the file will be downloaded to a temporary
@@ -205,32 +188,55 @@ function CreateCredential()
 
 <#
 .SYNOPSIS
-   Downloads any resources required by the configuration.
+    Downloads a resource module.
 .DESCRIPTION
-   It will ensure any required modules and files are downloaded.
-.PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    It will download a specific resource module, either from PowerShell Gallery
+    or from a URL if the module does not already exist.
+.PARAMETER Name
+    Contains the Name of the module to download.
+.PARAMETER URL
+    If this parameter is specified, the resource module will be downloaded from a URL rather than via PowerShell Gallery.
+    This is a the URL to use to download a zip file containing this resource module.
+.PARAMETER Folder
+    If this resource module is downloaded using a URL, this is the folder in the zip file that contains the resource and will need to be renamed to the name of the resource.
+.PARAMETER RequiredVersion
+    This is the required version of the Resource Module that is required.
+    If this version is not installed the a new version will be downloaded.
+.PARAMETER MinimumVersion
+    This is the minimum version of the Resource Module that is required.
+    If at least this version is not installed then a new version will be downloaded.
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   DownloadResources -Lab $Lab
-   Loads a Lab Builder configuration and downloads any resources required by it.   
+    DownloadResourceModule `
+        -Name xNetworking `
+        -RequiredVersion 2.7.0.0
+    Downloads the Resource Module xNetowrking version 2.7.0.0
 .OUTPUTS
-   None.
+    None.
 #>
-function DownloadModule {
+function DownloadResourceModule {
     [CmdLetBinding()]
     param
     (
-        [Parameter(Mandatory)]
+        [Parameter(
+            position=1,
+            Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [String] $Name,
 
+        [Parameter(
+            position=2)]
         [String] $URL,
 
+        [Parameter(
+            position=3)]
         [String] $Folder,
         
+        [Parameter(
+            position=4)]
         [String] $RequiredVersion,
 
+        [Parameter(
+            position=5)]
         [String] $MinimumVersion
     )
 
@@ -240,7 +246,7 @@ function DownloadModule {
     if ($RequiredVersion) {
         [ScriptBlock] $Query = `
             { ($_.Name -eq $Name) -and ($_.Version -eq $RequiredVersion) }
-        $VersionMessage = $RequiredVersion                
+        $VersionMessage = $RequiredVersion
     }
     elseif ($MinimumVersion)
     {
@@ -300,7 +306,15 @@ function DownloadModule {
         {
             # Install the package via PowerShellGet from the PowerShellGallery
             # Make sure the Nuget Package provider is initialized.
-            $null = Get-PackageProvider -name nuget -ForceBootStrap -Force
+            $null = Get-PackageProvider `
+                -name nuget `
+                -ForceBootStrap `
+                -Force
+
+            # Make sure PSGallery is trusted
+            Set-PSRepository `
+                -Name PSGallery `
+                -InstallationPolicy Trusted
 
             # Install the module
             $Splat = [PSObject] @{ Name = $Name }
@@ -330,76 +344,7 @@ function DownloadModule {
             }
         } # If
     } # If
-} # DownloadModule
-
-
-<#
-.SYNOPSIS
-   Downloads any resources required by the configuration.
-.DESCRIPTION
-   It will ensure any required modules and files are downloaded.
-.PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
-.EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   DownloadResources -Lab $Lab
-   Loads a Lab Builder configuration and downloads any resources required by it.   
-.OUTPUTS
-   None.
-#>
-function DownloadResources {
-    [CmdLetBinding()]
-    param
-    (
-        [Parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
-        $Lab
-    )
-        
-    # Downloading Lab Resources
-    Write-Verbose -Message $($LocalizedData.DownloadingLabResourcesMessage)
-
-    # Bootstrap Nuget # This needs to be a test, not a force 
-    # $null = Get-PackageProvider -Name NuGet -ForceBootstrap -Force
-    
-    # Make sure PSGallery is trusted
-    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted    
-    
-    # Download any other resources required by this lab
-    if ($Lab.labbuilderconfig.resources) 
-    {
-        foreach ($Module in $Lab.labbuilderconfig.resources.module)
-        {
-            if (-not $Module.Name)
-            {
-                $ExceptionParameters = @{
-                    errorId = 'ResourceModuleNameEmptyError'
-                    errorCategory = 'InvalidArgument'
-                    errorMessage = $($LocalizedData.ResourceModuleNameEmptyError)
-                }
-                ThrowException @ExceptionParameters
-            } # If
-            $Splat = [PSObject] @{ Name = $Module.Name }
-            if ($Module.URL)
-            {
-                $Splat += [PSObject] @{ URL = $Module.URL }
-            }
-            if ($Module.Folder)
-            {
-                $Splat += [PSObject] @{ Folder = $Module.Folder }
-            }
-            if ($Module.RequiredVersion)
-            {
-                $Splat += [PSObject] @{ RequiredVersion = $Module.RequiredVersion }
-            }
-            if ($Module.MiniumVersion)
-            {
-                $Splat += [PSObject] @{ MiniumVersion = $Module.MiniumVersion }
-            }
-            DownloadModule @Splat
-        } # Foreach
-    } # If
-} # DownloadResources
+} # DownloadResourceModule
 
 
 <#

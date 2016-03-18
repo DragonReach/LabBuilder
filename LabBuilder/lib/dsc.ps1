@@ -3,70 +3,203 @@
     Get a list of all Resources imported in a DSC Config
 .DESCRIPTION
     Uses RegEx to pull a list of Resources that are imported in a DSC Configuration using the
-    Import-DSCResource cmdlet
-    
-    The xNetworking will always be included and the PSDesiredConfigration will always be excluded.
+    Import-DSCResource cmdlet.
+
+    If The -ModuleVersion parameter is included then the ModuleVersion property in the returned
+    LabDSCModule object will be set, otherwise it will be null.
 .PARAMETER DSCConfigFile
-    Contains the path to the DSC Config file to extract resource module names from
+    Contains the path to the DSC Config file to extract resource module names from.
+.PARAMETER DSCConfigContent
+    Contains the content of the DSC Config to extract resource module names from.
 .EXAMPLE
     GetModulesInDSCConfig -DSCConfigFile c:\mydsc\Server01.ps1
     Return the DSC Resource module list from file c:\mydsc\server01.ps1
+.EXAMPLE
+    GetModulesInDSCConfig -DSCConfigContent $DSCConfig
+    Return the DSC Resource module list from the DSC Config in $DSCConfig.
 .OUTPUTS
-    An array of strings containing resource module names
+    An array of LabDSCModule objects containing the DSC Resource modules required by this DSC
+    configuration file.
 #>
 function GetModulesInDSCConfig()
 {
-    [CmdletBinding()]
-    [OutputType([String[]])]
+   [CmdLetBinding(DefaultParameterSetName="Content")]
+   [OutputType([Object[]])]
     Param
     (
-        [Parameter(Mandatory=$True)]
-        [ValidateNotNullOrEmpty()]	
+        [parameter(
+            Position=1,
+            ParameterSetName="Content",
+            Mandatory=$true)]
+        [String] $DSCConfigContent,
+
+        [parameter(
+            Position=2,
+            ParameterSetName="File",
+            Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
         [String] $DSCConfigFile
     )
-    [String[]] $Modules = $Null
-    [String] $Content = Get-Content -Path $DSCConfigFile
-    $Regex = "Import\-DscResource\s(?:\-ModuleName\s)?'?`"?([A-Za-z0-9._-]+)`"?'?"
-    $Matches = [regex]::matches($Content, $Regex, 'IgnoreCase')
+    [LabDSCModule[]] $Modules = $Null
+    if ($PSCmdlet.ParameterSetName -eq 'File')
+    {
+        [String] $DSCConfigContent = Get-Content -Path $DSCConfigFile -RAW
+    } # if
+    $Regex = "[ \t]*?Import\-DscResource[ \t]+(?:\-ModuleName[ \t])?'?`"?([A-Za-z0-9._-]+)`"?'?(([ \t]+-ModuleVersion)?[ \t]+'?`"?([0-9.]+)`"?`?)?[ \t]*?[\r\n]+?"
+    $Matches = [regex]::matches($DSCConfigContent, $Regex, 'IgnoreCase')
     foreach ($Match in $Matches)
     {
-        if ($Match.Groups[1].Value -ne 'PSDesiredStateConfiguration')
+        $ModuleName = $Match.Groups[1].Value
+        $ModuleVersion = $Match.Groups[4].Value
+        # Make sure this module isn't already in the list
+        if ($ModuleName -notin $Modules.ModuleName)
         {
-            $Modules += $Match.Groups[1].Value
-        } # If
-    } # Foreach
-    # Add the xNetworking DSC Resource because it is always used
-    $Modules += 'xNetworking'
+            $Module = [LabDSCModule]::New($ModuleName)
+            if (-not [String]::IsNullOrWhitespace($ModuleVersion))
+            {
+                $Module.ModuleVersion = $ModuleVersion
+            } # if
+            $Modules += @( $Module )
+        } # if
+    } # foreach
     Return $Modules
 } # GetModulesInDSCConfig
 
 
+<#
+.SYNOPSIS
+    Sets the Modules Resources that should be imported in a DSC Config.
+.DESCRIPTION
+    It will completely replace the list of Imported DSCResources with this new list.
+.PARAMETER DSCConfigFile
+    Contains the path to the DSC Config file to set resource module names in.
+.PARAMETER DSCConfigContent
+    Contains the content of the DSC Config to set resource module names in.
+.PARAMETER Modules
+    Contains an array of LabDSCModule objects to replace set in the Configuration.
+.EXAMPLE
+    SetModulesInDSCConfig -DSCConfigFile c:\mydsc\Server01.ps1 -Modules $Modules
+    Set the DSC Resource module in the content from file c:\mydsc\server01.ps1
+.EXAMPLE
+    SetModulesInDSCConfig -DSCConfigContent $DSCConfig -Modules $Modules
+    Set the DSC Resource module in the content $DSCConfig
+.OUTPUTS
+    A string containing the content of the DSC Config file with the updated
+    module names in it.
+#>
+function SetModulesInDSCConfig()
+{
+   [CmdLetBinding(DefaultParameterSetName="Content")]
+   [OutputType([String])]
+    Param
+    (
+        [parameter(
+            Position=1,
+            ParameterSetName="Content",
+            Mandatory=$true)]
+        [String] $DSCConfigContent,
+
+        [parameter(
+            Position=2,
+            ParameterSetName="File",
+            Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String] $DSCConfigFile,
+
+        [parameter(
+            Position=3,
+            Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [LabDSCModule[]] $Modules
+    )
+    if ($PSCmdlet.ParameterSetName -eq 'File')
+    {
+        [String] $DSCConfigContent = Get-Content -Path $DSCConfigFile -RAW
+    } # if
+    $Regex = "[ \t]*?Import\-DscResource[ \t]+(?:\-ModuleName[ \t])?'?`"?([A-Za-z0-9._-]+)`"?'?(([ \t]+-ModuleVersion)?[ \t]+'?`"?([0-9.]+)`"?`?)?[ \t]*?[\r\n]+?"
+    $Matches = [regex]::matches($DSCConfigContent, $Regex, 'IgnoreCase')
+    foreach ($Module in $Modules)
+    {
+        $ImportCommand = "Import-DscResource -ModuleName '$($Module.ModuleName)'"
+        if ($Module.ModuleVersion)
+        {
+            $ImportCommand = "$ImportCommand -ModuleVersion '$($Module.ModuleVersion)'"
+        } # if
+        $ImportCommand = "    $ImportCommand"
+        # is this module already in there?
+        [Boolean] $Found = $False
+        foreach ($Match in $Matches)
+        {
+            if ($Match.Groups[1].Value -eq $Module.ModuleName)
+            {
+                # Found the module - so replace it
+                $DSCConfigContent = ("{0}{1}{2}") `
+                    -f $DSCConfigContent.Substring(0,$Match.Index),`
+                    $ImportCommand,`
+                    $DSCConfigContent.Substring($Match.Index+$Match.Length)
+                $Matches = [regex]::matches($DSCConfigContent, $Regex, 'IgnoreCase')
+                $Found = $True
+                break
+            } # if
+        } # foreach
+        if (-not $Found)
+        {
+            if ($Matches.Count -gt 0)
+            {
+                # Add this to the end of the existing Import-DSCResource lines
+                $Match = $Matches[$Matches.count-1]
+            }
+            else
+            {
+                # There are no existing DSC Resource lines, so add it after
+                # Configuration ... { line
+                $Match = [regex]::matches($DSCConfigContent, "[ \t]*?Configuration[ \t]+?'?`"?[A-Za-z0-9._-]+`"?'?[ \t]*?[\r\n]*?{[\r\n]?", 'IgnoreCase')
+                if (-not $Match)
+                {
+                    $ExceptionParameters = @{
+                        errorId = 'DSCConfiguartionMissingError'
+                        errorCategory = 'InvalidArgument'
+                        errorMessage = $($LocalizedData.DSCConfiguartionMissingError)
+                    }
+                    ThrowException @ExceptionParameters
+                }
+            } # if
+            $DSCConfigContent = ("{0}{1}{2}") `
+                -f $DSCConfigContent.Substring(0,$Match.Index+$Match.Length),`
+                $ImportCommand,`
+                $DSCConfigContent.Substring($Match.Index+$Match.Length)
+            $Matches = [regex]::matches($DSCConfigContent, $Regex, 'IgnoreCase')
+        } # Module not found so add it to the end
+    } # foreach
+    Return $DSCConfigContent
+} # SetModulesInDSCConfig
+
 
 <#
 .SYNOPSIS
-   This function prepares all the files and modules necessary for a VM to be configured using
-   Desired State Configuration (DSC).
+    This function prepares all the files and modules necessary for a VM to be configured using
+    Desired State Configuration (DSC).
 .DESCRIPTION
-   This funcion performs the following tasks in preparation for starting Desired State
-   Configuration on a Virtual Machine:
-     1. Ensures the folder structure for the Virtual Machine DSC files is available.
-     2. Gets a list of all Modules required by the DSC configuration to be applied.
-     3. Download and Install any missing DSC modules required for the DSC configuration.
-     4. Copy all modules required for the DSC configuration to the VM folder.
-     5. Cause a self-signed cetficiate to be created and downloaded on the Lab VM.
-     6. Create a Networking DSC configuration file and ensure the DSC config file calss it.
-     7. Create the MOF file from the config and an LCM config.
+    This funcion performs the following tasks in preparation for starting Desired State
+    Configuration on a Virtual Machine:
+        1. Ensures the folder structure for the Virtual Machine DSC files is available.
+        2. Gets a list of all Modules required by the DSC configuration to be applied.
+        3. Download and Install any missing DSC modules required for the DSC configuration.
+        4. Copy all modules required for the DSC configuration to the VM folder.
+        5. Cause a self-signed cetficiate to be created and downloaded on the Lab VM.
+        6. Create a Networking DSC configuration file and ensure the DSC config file calss it.
+        7. Create the MOF file from the config and an LCM config.
 .PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    Contains the Lab object that was produced by the Get-Lab cmdlet.
 .PARAMETER VM
-   A Virtual Machine object pulled from the Lab Configuration file using Get-LabVM
+    A LabVM object pulled from the Lab Configuration file using Get-LabVM.
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   $VMs = Get-LabVM -Lab $Lab
-   CreateDSCMOFFiless -Lab $Lab -VM $VMs[0]
-   Prepare the first VM in the Lab c:\mylab\config.xml for DSC configuration.
+    $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
+    $VMs = Get-LabVM -Lab $Lab
+    CreateDSCMOFFiless -Lab $Lab -VM $VMs[0]
+    Prepare the first VM in the Lab c:\mylab\config.xml for DSC configuration.
 .OUTPUTS
-   None.
+    None.
 #>
 function CreateDSCMOFFiles {
     [CmdLetBinding()]
@@ -76,19 +209,19 @@ function CreateDSCMOFFiles {
         $Lab,
 
         [Parameter(Mandatory)]
-        [System.Collections.Hashtable] $VM
+        [LabVM] $VM
     )
 
     [String] $DSCMOFFile = ''
     [String] $DSCMOFMetaFile = ''
-  
+
     # Get the root path of the VM
     [String] $VMRootPath = $VM.VMRootPath
 
     # Get Path to LabBuilder files
     [String] $VMLabBuilderFiles = $VM.LabBuilderFilesPath
 
-    if (-not $VM.DSCConfigFile)
+    if (-not $VM.DSC.ConfigFile)
     {
         # This VM doesn't have a DSC Configuration
         return
@@ -97,52 +230,83 @@ function CreateDSCMOFFiles {
     # Make sure all the modules required to create the MOF file are installed
     $InstalledModules = Get-Module -ListAvailable
     Write-Verbose -Message $($LocalizedData.DSCConfigIdentifyModulesMessage `
-        -f $VM.DSCConfigFile,$VM.Name)
+        -f $VM.DSC.ConfigFile,$VM.Name)
 
-    $DSCModules = GetModulesInDSCConfig -DSCConfigFile $($VM.DSCConfigFile)
-    foreach ($ModuleName in $DSCModules)
+    [String] $DSCConfigContent = Get-Content `
+        -Path $($VM.DSC.ConfigFile) `
+        -RAW
+    [LabDSCModule[]] $DSCModules = GetModulesInDSCConfig `
+        -DSCConfigContent $DSCConfigContent
+
+    # Add the xNetworking DSC Resource because it is always used
+    $Module = [LabDSCModule]::New('xNetworking')
+    $DSCModules += @( $Module ) 
+
+    foreach ($DSCModule in $DSCModules)
     {
-        if (($InstalledModules | Where-Object -Property Name -EQ $ModuleName).Count -eq 0)
+        $ModuleName = $DSCModule.ModuleName
+        $ModuleSplat = @{ Name = $ModuleName }
+        $ModuleVersion = $DSCModule.Version
+        if ($ModuleVersion)
+        {
+            $FilterScript = { ($_.Name -eq $ModuleName) -and ($ModuleVersion -eq $_.Version) }
+            $ModuleSplat += @{ RequiredVersion = $ModuleVersion }
+        }
+        else
+        {
+            $FilterScript = { ($_.Name -eq $ModuleName) }
+        }
+        $Module = ($InstalledModules | Where-Object -FilterScript $FilterScript | Sort-Object -Property Version -Descending | Select-Object -First 1)
+        
+        if ($Module)
+        {
+            # The module already exists, load the version number into the Module
+            # to force the version number to be set in the DSC Config file
+            $DSCModule.ModuleVersion = $Module.Version
+        }
+        else
         {
             # The Module isn't available on this computer, so try and install it
             Write-Verbose -Message $($LocalizedData.DSCConfigSearchingForModuleMessage `
-                -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+                -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
 
-            $NewModule = Find-Module -Name $ModuleName
+            $NewModule = Find-Module `
+                @ModuleSplat
             if ($NewModule)
             {
                 Write-Verbose -Message $($LocalizedData.DSCConfigInstallingModuleMessage `
-                    -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+                    -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
 
-                Try
+                try
                 {
                     $NewModule | Install-Module
                 }
-                Catch
+                catch
                 {
                     $ExceptionParameters = @{
                         errorId = 'DSCModuleDownloadError'
                         errorCategory = 'InvalidArgument'
                         errorMessage = $($LocalizedData.DSCModuleDownloadError `
-                            -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+                            -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
                     }
                     ThrowException @ExceptionParameters
                 }
             }
-            Else
+            else
             {
                 $ExceptionParameters = @{
                     errorId = 'DSCModuleDownloadError'
                     errorCategory = 'InvalidArgument'
                     errorMessage = $($LocalizedData.DSCModuleDownloadError `
-                        -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+                        -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
                 }
                 ThrowException @ExceptionParameters
             }
-        } # If
+            $DSCModule.ModuleVersion = $NewModule.Version
+        } # if
 
         Write-Verbose -Message $($LocalizedData.DSCConfigSavingModuleMessage `
-            -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+            -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
 
         # Find where the module is actually stored
         [String] $ModulePath = ''
@@ -153,7 +317,7 @@ function CreateDSCMOFFiles {
                 -ChildPath $ModuleName
             if (Test-Path -Path $ModulePath)
             {
-                Break
+                break
             } # If
         } # Foreach
         if (-not (Test-Path -Path $ModulePath))
@@ -162,7 +326,7 @@ function CreateDSCMOFFiles {
                 errorId = 'DSCModuleNotFoundError'
                 errorCategory = 'InvalidArgument'
                 errorMessage = $($LocalizedData.DSCModuleNotFoundError `
-                    -f $VM.DSCConfigFile,$VM.Name,$ModuleName)
+                    -f $VM.DSC.ConfigFile,$VM.Name,$ModuleName)
             }
             ThrowException @ExceptionParameters
         }
@@ -182,13 +346,13 @@ function CreateDSCMOFFiles {
         }
         ThrowException @ExceptionParameters
     }
-    
+
     # Remove any old self-signed certifcates for this VM
     Get-ChildItem -Path cert:\LocalMachine\My `
         | Where-Object { $_.FriendlyName -eq $Script:DSCCertificateFriendlyName } `
         | Remove-Item
-    
-    # Add the VM Self-Signed Certificate to the Local Machine store and get the Thumbprint	
+
+    # Add the VM Self-Signed Certificate to the Local Machine store and get the Thumbprint    
     [String] $CertificateFile = Join-Path `
         -Path $VMLabBuilderFiles `
         -ChildPath $Script:DSCEncryptionCert
@@ -202,7 +366,7 @@ function CreateDSCMOFFiles {
         -Path $ENV:Temp `
         -ChildPath "$($VM.ComputerName).mof"
     $DSCMOFMetaFile = ([System.IO.Path]::ChangeExtension($DSCMOFFile,'meta.mof'))
-        
+
     # Generate the LCM MOF File
     Write-Verbose -Message $($LocalizedData.DSCConfigCreatingLCMMOFMessage `
         -f $DSCMOFMetaFile,$VM.Name)
@@ -224,8 +388,8 @@ function CreateDSCMOFFiles {
 
     # A DSC Config File was provided so create a MOF File out of it.
     Write-Verbose -Message $($LocalizedData.DSCConfigCreatingMOFMessage `
-        -f $VM.DSCConfigFile,$VM.Name)
-    
+        -f $VM.DSC.ConfigFile,$VM.Name)
+
     # Now create the Networking DSC Config file
     [String] $DSCNetworkingConfig = GetDSCNetworkingConfig `
         -Lab $Lab -VM $VM
@@ -239,19 +403,21 @@ function CreateDSCMOFFiles {
     [String] $DSCFile = Join-Path `
         -Path $VMLabBuilderFiles `
         -ChildPath 'DSC.ps1'
-    [String] $DSCContent = Get-Content `
-        -Path $VM.DSCConfigFile `
-        -Raw
-    
-    if (-not ($DSCContent -match 'Networking Network {}'))
+
+    # Set the Modules List in the DSC Configuration
+    $DSCConfigContent = SetModulesInDSCConfig `
+        -DSCConfigContent $DSCConfigContent `
+        -Modules $DSCModules
+
+    if (-not ($DSCConfigContent -match 'Networking Network {}'))
     {
         # Add the Networking Configuration item to the base DSC Config File
         # Find the location of the line containing "Node $AllNodes.NodeName {"
         [String] $Regex = '\s*Node\s.*{.*'
-        $Matches = [regex]::matches($DSCContent, $Regex, 'IgnoreCase')
+        $Matches = [regex]::matches($DSCConfigContent, $Regex, 'IgnoreCase')
         if ($Matches.Count -eq 1)
         {
-            $DSCContent = $DSCContent.`
+            $DSCConfigContent = $DSCConfigContent.`
                 Insert($Matches[0].Index+$Matches[0].Length,"`r`nNetworking Network {}`r`n")
         }
         Else
@@ -260,23 +426,23 @@ function CreateDSCMOFFiles {
                 errorId = 'DSCConfigMoreThanOneNodeError'
                 errorCategory = 'InvalidArgument'
                 errorMessage = $($LocalizedData.DSCConfigMoreThanOneNodeError `
-                    -f $VM.DSCConfigFile,$VM.Name)
+                    -f $VM.DSC.ConfigFile,$VM.Name)
             }
             ThrowException @ExceptionParameters
         } # If
     } # If
-    
+
     # Save the DSC Content
     $null = Set-Content `
         -Path $DSCFile `
-        -Value $DSCContent `
+        -Value $DSCConfigContent `
         -Force
 
     # Hook the Networking DSC File into the main DSC File
     . $DSCFile
 
-    [String] $DSCConfigName = $VM.DSCConfigName
-    
+    [String] $DSCConfigName = $VM.DSC.ConfigName
+
     Write-Verbose -Message $($LocalizedData.DSCConfigPrepareMessage `
         -f $DSCConfigname,$VM.Name)
 
@@ -289,7 +455,7 @@ function CreateDSCMOFFiles {
             CertificateFile = '$CertificateFile'
             Thumbprint = '$CertificateThumbprint' 
             LocalAdminPassword = '$($VM.administratorpassword)'
-            $($VM.DSCParameters)
+            $($VM.DSC.Parameters)
         }
     )
 }
@@ -314,7 +480,7 @@ function CreateDSCMOFFiles {
             errorId = 'DSCConfigMOFCreateError'
             errorCategory = 'InvalidArgument'
             errorMessage = $($LocalizedData.DSCConfigMOFCreateError `
-                -f $VM.DSCConfigFile,$VM.Name)
+                -f $VM.DSC.ConfigFile,$VM.Name)
         }
         ThrowException @ExceptionParameters
     } # If
@@ -325,7 +491,7 @@ function CreateDSCMOFFiles {
         -Force
 
     Write-Verbose -Message $($LocalizedData.DSCConfigMOFCreatedMessage `
-        -f $VM.DSCConfigFile,$VM.Name)
+        -f $VM.DSC.ConfigFile,$VM.Name)
 
     # Copy the files to the LabBuilder Files folder
     $null = Copy-Item `
@@ -335,7 +501,7 @@ function CreateDSCMOFFiles {
             -ChildPath "$($VM.ComputerName).mof") `
         -Force
 
-    if (-not $VM.DSCMOFFile)
+    if (-not $VM.DSC.MOFFile)
     {
         # Remove Temporary files created by DSC
         $null = Remove-Item `
@@ -351,7 +517,7 @@ function CreateDSCMOFFiles {
                 -Path $VMLabBuilderFiles `
                 -ChildPath "$($VM.ComputerName).meta.mof") `
             -Force
-        if (-not $VM.DSCMOFFile)
+        if (-not $VM.DSC.MOFFile)
         {
             # Remove Temporary files created by DSC
             $null = Remove-Item `
@@ -364,29 +530,29 @@ function CreateDSCMOFFiles {
 
 <#
 .SYNOPSIS
-   This function prepares the PowerShell scripts used for starting up DSC on a VM.
+    This function prepares the PowerShell scripts used for starting up DSC on a VM.
 .DESCRIPTION
-   Two PowerShell scripts will be created by this function in the LabBuilder Files
-   folder of the VM:
-     1. StartDSC.ps1 - the script that is called automatically to start up DSC.
-     2. StartDSCDebug.ps1 - a debug script that will start up DSC in debug mode.
-   These scripts will contain code to perform the following operations:
-     1. Configure the names of the Network Adapters so that they will match the 
-        names in the DSC Configuration files.
-     2. Enable/Disable DSC Event Logging.
-     3. Apply Configuration to the Local Configuration Manager.
-     4. Start DSC.
+    Two PowerShell scripts will be created by this function in the LabBuilder Files
+    folder of the VM:
+        1. StartDSC.ps1 - the script that is called automatically to start up DSC.
+        2. StartDSCDebug.ps1 - a debug script that will start up DSC in debug mode.
+    These scripts will contain code to perform the following operations:
+        1. Configure the names of the Network Adapters so that they will match the 
+            names in the DSC Configuration files.
+        2. Enable/Disable DSC Event Logging.
+        3. Apply Configuration to the Local Configuration Manager.
+        4. Start DSC.
 .PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    Contains the Lab object that was produced by the Get-Lab cmdlet.
 .PARAMETER VM
-   A Virtual Machine object pulled from the Lab Configuration file using Get-LabVM
+    A LabVM object pulled from the Lab Configuration file using Get-LabVM.
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   $VMs = Get-LabVM -Lab $Lab
-   SetDSCStartFile -Lab $Lab -VM $VMs[0]
-   Prepare the first VM in the Lab c:\mylab\config.xml for DSC start up.
+    $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
+    $VMs = Get-LabVM -Lab $Lab
+    SetDSCStartFile -Lab $Lab -VM $VMs[0]
+    Prepare the first VM in the Lab c:\mylab\config.xml for DSC start up.
 .OUTPUTS
-   None.
+    None.
 #>
 function SetDSCStartFile {
     [CmdLetBinding()]
@@ -396,7 +562,7 @@ function SetDSCStartFile {
         $Lab,
 
         [Parameter(Mandatory)]
-        [System.Collections.Hashtable] $VM
+        [LabVM] $VM
     )
 
     [String] $DSCStartPs = ''
@@ -444,7 +610,7 @@ Get-NetAdapter ``
     } # Foreach
 
     # Enable DSC logging (as long as it hasn't been already)
-    [String] $Logging = ($VM.DSCLogging).ToString() 
+    [String] $Logging = ($VM.DSC.Logging).ToString() 
     $DSCStartPs += @"
 `$Result = & "wevtutil.exe" get-log "Microsoft-Windows-Dsc/Analytic"
 if (-not (`$Result -like '*enabled: true*')) {
@@ -489,29 +655,29 @@ Start-DSCConfiguration ``
 
 <#
 .SYNOPSIS
-   This function prepares all files require to configure a VM using Desired State
-   Configuration (DSC).
+    This function prepares all files require to configure a VM using Desired State
+    Configuration (DSC).
 .DESCRIPTION
-   Calling this function will cause the LabBuilder folder to be populated/updated
-   with all files required to configure a Virtual Machine with DSC.
-   This includes:
-     1. Required DSC Resouce Modules.
-     2. DSC Credential Encryption certificate.
-     3. DSC Configuration files.
-     4. DSC MOF Files for general config and for LCM config.
-     5. Start up scripts.
+    Calling this function will cause the LabBuilder folder to be populated/updated
+    with all files required to configure a Virtual Machine with DSC.
+    This includes:
+        1. Required DSC Resouce Modules.
+        2. DSC Credential Encryption certificate.
+        3. DSC Configuration files.
+        4. DSC MOF Files for general config and for LCM config.
+        5. Start up scripts.
 .PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    Contains the Lab object that was produced by the Get-Lab cmdlet.
 .PARAMETER VM
-   A Virtual Machine object pulled from the Lab Configuration file using Get-LabVM
+    A LabVM object pulled from the Lab Configuration file using Get-LabVM
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   $VMs = Get-LabVM -Lab $Lab
-   InitializeDSC -Lab $Lab -VM $VMs[0]
-   Prepares all files required to start up Desired State Configuration for the
-   first VM in the Lab c:\mylab\config.xml for DSC start up.
+    $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
+    $VMs = Get-LabVM -Lab $Lab
+    InitializeDSC -Lab $Lab -VM $VMs[0]
+    Prepares all files required to start up Desired State Configuration for the
+    first VM in the Lab c:\mylab\config.xml for DSC start up.
 .OUTPUTS
-   None.
+    None.
 #>
 function InitializeDSC {
     [CmdLetBinding()]
@@ -520,7 +686,7 @@ function InitializeDSC {
         $Lab,
 
         [Parameter(Mandatory)]
-        [System.Collections.Hashtable] $VM
+        [LabVM] $VM
     )
 
     # Are there any DSC Settings to manage?
@@ -533,31 +699,31 @@ function InitializeDSC {
 
 <#
 .SYNOPSIS
-   Uploads prepared Modules and MOF files to a VM and starts up Desired State
-   Configuration (DSC) on it.
+    Uploads prepared Modules and MOF files to a VM and starts up Desired State
+    Configuration (DSC) on it.
 .DESCRIPTION
-   This function will perform the following tasks:
-     1. Connect to the VM via remoting.
-     2. Upload the DSC and LCM MOF files to the c:\windows\setup\scripts folder of the VM.
-     3. Upload DSC Start up scripts to the c:\windows\setup\scripts folder of the VM.
-     4. Upload all required modules to the c:\program files\WindowsPowerShell\Modules\ folder
-        of the VM.
-     5. Invoke the StartDSC.ps1 script on the VM to start DSC processing.
+    This function will perform the following tasks:
+        1. Connect to the VM via remoting.
+        2. Upload the DSC and LCM MOF files to the c:\windows\setup\scripts folder of the VM.
+        3. Upload DSC Start up scripts to the c:\windows\setup\scripts folder of the VM.
+        4. Upload all required modules to the c:\program files\WindowsPowerShell\Modules\ folder
+            of the VM.
+        5. Invoke the StartDSC.ps1 script on the VM to start DSC processing.
 .PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    Contains the Lab object that was produced by the Get-Lab cmdlet.
 .PARAMETER VM
-   A Virtual Machine object pulled from the Lab Configuration file using Get-LabVM
+    A LabVM object pulled from the Lab Configuration file using Get-LabVM
 .PARAMETER Timeout
-   The maximum amount of time that this function can take to perform DSC start-up.
-   If the timeout is reached before the process is complete an error will be thrown.
-   The timeout defaults to 300 seconds.   
+    The maximum amount of time that this function can take to perform DSC start-up.
+    If the timeout is reached before the process is complete an error will be thrown.
+    The timeout defaults to 300 seconds.   
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   $VMs = Get-LabVM -Lab $Lab
-   StartDSC -Lab $Lab -VM $VMs[0]
-   Starts up Desired State Configuration for the first VM in the Lab c:\mylab\config.xml.
+    $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
+    $VMs = Get-LabVM -Lab $Lab
+    StartDSC -Lab $Lab -VM $VMs[0]
+    Starts up Desired State Configuration for the first VM in the Lab c:\mylab\config.xml.
 .OUTPUTS
-   None.
+    None.
 #>
 function StartDSC {
     [CmdLetBinding()]
@@ -566,7 +732,7 @@ function StartDSC {
         $Lab,
 
         [Parameter(Mandatory)]
-        [System.Collections.Hashtable] $VM,
+        [LabVM] $VM,
 
         [Int] $Timeout = 300
     )
@@ -586,7 +752,7 @@ function StartDSC {
         $Session = Connect-LabVM `
             -VM $VM `
             -ErrorAction Continue
-        
+
         # Failed to connnect to the VM
         if (-not $Session)
         {
@@ -596,10 +762,10 @@ function StartDSC {
                 errorMessage = $($LocalizedData.DSCInitializationError `
                     -f $VM.Name)
             }
-            ThrowException @ExceptionParameters            
+            ThrowException @ExceptionParameters
             return
         }
-        
+
         if (($Session) `
             -and ($Session.State -eq 'Opened') `
             -and (-not $ConfigCopyComplete))
@@ -652,9 +818,9 @@ function StartDSC {
                         -f $VM.Name,'DSC',$Script:RetryConnectSeconds)
 
                     Start-Sleep -Seconds $Script:RetryConnectSeconds
-                } # Try
-            } # While
-        } # If
+                } # try
+            } # while
+        } # if
 
         # If the copy didn't complete and we're out of time throw an exception
         if ((-not $ConfigCopyComplete) `
@@ -672,41 +838,57 @@ function StartDSC {
                     -f $VM.Name)
             }
             ThrowException @ExceptionParameters
-        } # If
+        } # if
 
         # Upload any required modules to the VM
         if (($Session) `
             -and ($Session.State -eq 'Opened') `
             -and (-not $ModuleCopyComplete))
         {
-            $DSCModules = GetModulesInDSCConfig -DSCConfigFile $($VM.DSCConfigFile)
-            foreach ($ModuleName in $DSCModules)
+            [String] $DSCContent = Get-Content `
+                -Path $($VM.DSC.ConfigFile) `
+                -RAW
+            [LabDSCModule[]] $DSCModules = GetModulesInDSCConfig `
+                -DSCConfigContent $DSCContent
+
+            # Add the xNetworking DSC Resource because it is always used
+            $Module = [LabDSCModule]::New('xNetworking')
+            $DSCModules += @( $Module ) 
+
+            foreach ($DSCModule in $DSCModules)
             {
-                try
+                $ModuleName = $DSCModule.ModuleName
+                # Upload all but PSDesiredStateConfiguration because it
+                # should always exist on client node.
+                if ($ModuleName -ne 'PSDesiredStateConfiguration')
                 {
-                    Write-Verbose -Message $($LocalizedData.CopyingFilesToVMMessage `
-                        -f $VM.Name,"DSC Module $ModuleName")
+                    $ModuleVersion = $DSCModule.Version
+                    try
+                    {
+                        Write-Verbose -Message $($LocalizedData.CopyingFilesToVMMessage `
+                            -f $VM.Name,"DSC Module $ModuleName")
 
-                    $null = Copy-Item `
-                        -Path (Join-Path `
-                            -Path $VMLabBuilderFiles `
-                            -ChildPath "DSC Modules\$ModuleName\") `
-                        -Destination "$($env:ProgramFiles)\WindowsPowerShell\Modules\" `
-                        -ToSession $Session `
-                        -Force `
-                        -Recurse `
-                        -ErrorAction Stop
-                }
-                catch
-                {
-                    Write-Verbose -Message $($LocalizedData.CopyingFilesToVMFailedMessage `
-                        -f $VM.Name,"DSC Module $ModuleName",$Script:RetryConnectSeconds)
+                        $null = Copy-Item `
+                            -Path (Join-Path `
+                                -Path $VMLabBuilderFiles `
+                                -ChildPath "DSC Modules\$ModuleName\") `
+                            -Destination "$($env:ProgramFiles)\WindowsPowerShell\Modules\" `
+                            -ToSession $Session `
+                            -Force `
+                            -Recurse `
+                            -ErrorAction Stop
+                    }
+                    catch
+                    {
+                        Write-Verbose -Message $($LocalizedData.CopyingFilesToVMFailedMessage `
+                            -f $VM.Name,"DSC Module $ModuleName",$Script:RetryConnectSeconds)
 
-                    Start-Sleep -Seconds $Script:RetryConnectSeconds
-                } # Try
-            } # Foreach
+                        Start-Sleep -Seconds $Script:RetryConnectSeconds
+                    } # try
+                } # if
+            } # foreach
             $ModuleCopyComplete = $True
-        } # If
+        } # if
 
         # If the copy didn't complete and we're out of time throw an exception
         if ((-not $ModuleCopyComplete) `
@@ -724,7 +906,7 @@ function StartDSC {
                     -f $VM.Name)
             }
             ThrowException @ExceptionParameters
-        }
+        } # if
 
         # Finally, Start DSC up!
         if (($Session) `
@@ -743,28 +925,28 @@ function StartDSC {
                 -ErrorAction Continue
 
             $Complete = $True
-        } # If
-    } # While
+        } # if
+    } # while
 } # StartDSC
 
 
 <#
 .SYNOPSIS
-   Assemble the content of the Networking DSC config file.
+    Assemble the content of the Networking DSC config file.
 .DESCRIPTION
-   This function creates the content that will be written to the Networking DSC Config file
-   from the networking details stored in the VM object. 
+    This function creates the content that will be written to the Networking DSC Config file
+    from the networking details stored in the VM object. 
 .EXAMPLE
-   $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
-   $VMs = Get-LabVM -Lab $Lab
-   $NetworkingDSC = GetDSCNetworkingConfig -Lab $Lab -VM $VMs[0]
-   Return the Networking DSC for the first VM in the Lab c:\mylab\config.xml for DSC configuration.
+    $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
+    $VMs = Get-LabVM -Lab $Lab
+    $NetworkingDSC = GetDSCNetworkingConfig -Lab $Lab -VM $VMs[0]
+    Return the Networking DSC for the first VM in the Lab c:\mylab\config.xml for DSC configuration.
 .PARAMETER Lab
-   Contains the Lab object that was produced by the Get-Lab cmdlet.
+    Contains the Lab object that was produced by the Get-Lab cmdlet.
 .PARAMETER VM
-   A Virtual Machine object pulled from the Lab Configuration file using Get-LabVM
+    A LabVM object pulled from the Lab Configuration file using Get-LabVM
 .OUTPUTS
-   A string containing the DSC Networking config.
+    A string containing the DSC Networking config.
 #>
 function GetDSCNetworkingConfig {
     [CmdLetBinding()]
@@ -775,7 +957,7 @@ function GetDSCNetworkingConfig {
         $Lab,
 
         [Parameter(Mandatory)]
-        [System.Collections.Hashtable] $VM
+        [LabVM] $VM
     )
     [String] $DSCNetworkingConfig = @"
 Configuration Networking {
@@ -788,7 +970,7 @@ Configuration Networking {
         $AdapterCount++
         if ($Adapter.IPv4)
         {
-            if ($Adapter.IPv4.Address)
+            if (-not [String]::IsNullOrWhitespace($Adapter.IPv4.Address))
             {
 $DSCNetworkingConfig += @"
     xIPAddress IPv4_$AdapterCount {
@@ -799,7 +981,7 @@ $DSCNetworkingConfig += @"
     }
 
 "@
-                if ($Adapter.IPv4.DefaultGateway)
+                if (-not [String]::IsNullOrWhitespace($Adapter.IPv4.DefaultGateway))
                 {
 $DSCNetworkingConfig += @"
     xDefaultGatewayAddress IPv4G_$AdapterCount {
@@ -833,7 +1015,7 @@ $DSCNetworkingConfig += @"
 "@
 
             } # If
-            if ($null -ne $Adapter.IPv4.DNSServer)
+            if (-not [String]::IsNullOrWhitespace($Adapter.IPv4.DNSServer))
             {
 $DSCNetworkingConfig += @"
     xDnsServerAddress IPv4D_$AdapterCount {
@@ -847,7 +1029,7 @@ $DSCNetworkingConfig += @"
         } # If
         if ($Adapter.IPv6)
         {
-            if ($Adapter.IPv6.Address)
+            if (-not [String]::IsNullOrWhitespace($Adapter.IPv6.Address))
             {
 $DSCNetworkingConfig += @"
     xIPAddress IPv6_$AdapterCount {
@@ -858,7 +1040,7 @@ $DSCNetworkingConfig += @"
     }
 
 "@
-                if ($Adapter.IPv6.DefaultGateway)
+                if (-not [String]::IsNullOrWhitespace($Adapter.IPv6.DefaultGateway))
                 {
 $DSCNetworkingConfig += @"
     xDefaultGatewayAddress IPv6G_$AdapterCount {
@@ -892,7 +1074,7 @@ $DSCNetworkingConfig += @"
 "@
 
             } # If
-            if ($null -ne $Adapter.IPv6.DNSServer)
+            if (-not [String]::IsNullOrWhitespace($Adapter.IPv6.DNSServer))
             {
 $DSCNetworkingConfig += @"
     xDnsServerAddress IPv6D_$AdapterCount {

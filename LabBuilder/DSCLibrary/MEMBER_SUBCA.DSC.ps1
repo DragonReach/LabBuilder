@@ -1,24 +1,25 @@
-<#########################################################################################################################################
+<###################################################################################################
 DSC Template Configuration File For use by LabBuilder
 .Title
     MEMBER_SUBCA
 .Desription
     Builds a Enterprise Subordinate\Issuing CA.
 .Parameters:    
-          DomainName = "LABBUILDER.COM"
-          DomainAdminPassword = "P@ssword!1"
-          PSDscAllowDomainUser = $True
-          CACommonName = "LABBUILDER.COM Issuing CA"
-          CADistinguishedNameSuffix = "DC=LABBUILDER,DC=COM"
-          CRLPublicationURLs = "65:C:\Windows\system32\CertSrv\CertEnroll\%3%8%9.crl\n79:ldap:///CN=%7%8,CN=%2,CN=CDP,CN=Public Key Services,CN=Services,%6%10\n6:http://pki.labbuilder.com/CertEnroll/%3%8%9.crl"
-          CACertPublicationURLs = "1:C:\Windows\system32\CertSrv\CertEnroll\%1_%3%4.crt\n2:ldap:///CN=%7,CN=AIA,CN=Public Key Services,CN=Services,%6%11\n2:http://pki.labbuilder.com/CertEnroll/%1_%3%4.crt"
-          RootCAName = "SS_ROOTCA"
-          RootCACommonName = "LABBUILDER.COM Root CA"
-#########################################################################################################################################>
+    DomainName = "LABBUILDER.COM"
+    DomainAdminPassword = "P@ssword!1"
+    DCName = 'SA-DC1'
+    PSDscAllowDomainUser = $True
+    CACommonName = "LABBUILDER.COM Issuing CA"
+    CADistinguishedNameSuffix = "DC=LABBUILDER,DC=COM"
+    CRLPublicationURLs = "65:C:\Windows\system32\CertSrv\CertEnroll\%3%8%9.crl\n79:ldap:///CN=%7%8,CN=%2,CN=CDP,CN=Public Key Services,CN=Services,%6%10\n6:http://pki.labbuilder.com/CertEnroll/%3%8%9.crl"
+    CACertPublicationURLs = "1:C:\Windows\system32\CertSrv\CertEnroll\%1_%3%4.crt\n2:ldap:///CN=%7,CN=AIA,CN=Public Key Services,CN=Services,%6%11\n2:http://pki.labbuilder.com/CertEnroll/%1_%3%4.crt"
+    RootCAName = "SS_ROOTCA"
+    RootCACommonName = "LABBUILDER.COM Root CA"
+###################################################################################################>
+
 Configuration MEMBER_SUBCA
 {
-    Import-DscResource -ModuleName 'PSDesiredStateConfiguration' -ModuleVersion 1.1
-    Import-DscResource -ModuleName xActiveDirectory
+    Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
     Import-DscResource -ModuleName xComputerManagement
     Import-DscResource -ModuleName xAdcsDeployment
     Import-DscResource -ModuleName xPSDesiredStateConfiguration
@@ -31,13 +32,6 @@ Configuration MEMBER_SUBCA
         If ($Node.DomainAdminPassword) {
             [PSCredential]$DomainAdminCredential = New-Object System.Management.Automation.PSCredential ("$($Node.DomainName)\Administrator", (ConvertTo-SecureString $Node.DomainAdminPassword -AsPlainText -Force))
         }
-
-        # Install the RSAT PowerShell Module which is required by the xWaitForResource
-        WindowsFeature RSATADPowerShell
-        { 
-            Ensure = "Present" 
-            Name = "RSAT-AD-PowerShell" 
-        } 
 
         # Install the CA Service
         WindowsFeature ADCSCA {
@@ -84,23 +78,22 @@ Configuration MEMBER_SUBCA
         }
 
         # Wait for the Domain to be available so we can join it.
-        xWaitForADDomain DscDomainWait
+        WaitForAll DC
         {
-            DomainName = $Node.DomainName
-            DomainUserCredential = $DomainAdminCredential 
-            RetryCount = 100 
-            RetryIntervalSec = 10 
-            DependsOn = "[WindowsFeature]WebEnrollmentCA" 
+        ResourceName      = '[xADDomain]PrimaryDC'
+        NodeName          = $Node.DCname
+        RetryIntervalSec  = 15
+        RetryCount        = 60
         }
-
-        # Join this Server to the Domain so that it can be an Enterprise CA.
+        
+        # Join this Server to the Domain
         xComputer JoinDomain 
         { 
             Name          = $Node.NodeName
             DomainName    = $Node.DomainName
             Credential    = $DomainAdminCredential 
-            DependsOn = "[xWaitForADDomain]DscDomainWait" 
-        } 
+            DependsOn = "[WaitForAll]DC" 
+        }
             
         # Create the CAPolicy.inf file that sets basic parameters for certificate issuance for this CA.
         File CAPolicy
@@ -313,7 +306,7 @@ Configuration MEMBER_SUBCA
             # Configure the Online Responder Feature
             xADCSOnlineResponder ConfigOnlineResponder {
                 Ensure = 'Present'
-                Name = 'ConfigOnlineResponder'
+                IsSingleInstance  = 'Yes'
                 Credential = $LocalAdminCredential
                 DependsOn = '[Script]ADCSAdvConfig'
             }

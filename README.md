@@ -2,7 +2,6 @@ LabBuilder
 ==========
 
 [![Join the chat at https://gitter.im/PlagueHO/LabBuilder](https://badges.gitter.im/PlagueHO/LabBuilder.svg)](https://gitter.im/PlagueHO/LabBuilder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 [![Build status](https://ci.appveyor.com/api/projects/status/rcg7xmm97qhg2bjr/branch/master?svg=true)](https://ci.appveyor.com/project/PlagueHO/labbuilder/branch/master)
 
 
@@ -42,6 +41,29 @@ The general goals of this module are:
 + **Extensible**: Enable new Lab VM machine types to be configured by supplying different DSC library resources.
 
 
+Requirements
+============
+To use this Module you will require on your Lab Host:
+ 1. Operating Systems supported:
+    - Windows Server 2012
+    - Windows Server 2012 R2
+    - Windows Server 2016 TP4
+    - Windows 8.0
+    - Windows 8.1
+    - Windows 10
+ 2. Windows Management Framewok 5.0 (WMF5.0) Installed on your Lab Host.
+ 
+    _WMF 5.0 is installed on Windows 10 and Windows Server 2016 out of the box, but for Windows Server 2012/R2 and Windows 8/8.1 it will need to be installed separately._
+    _WMF 5.0 can be downloaded from [here](https://www.microsoft.com/en-us/download/details.aspx?id=50395)._
+    
+ 3. Hyper-V available (which requires intel-VT CPU support).
+ 4. To use labs that contain Nested Hyper-V hosts only Windows 10 built 10586 or later and Windows Server 2016 TP3 or later are supported.
+ 5. Copies of the Windows installation media for any Operating Systems that will be used in your Labs.
+    * Note: Most Lab configuration files can contain a URL where the relevant trial media can be downloaded from, but you can use any Windows Install Media source you choose (including custom built ISOs).
+ 6. An internet connection to download the WMF 5.0 MSU and any other optional MSU packages required by the Lab.
+    * Note: This only needs to be done during the Install-Lab phase and can be disabled after this phase is complete.
+
+
 Basic Usage Guide
 =================
 The use of this module is fairly simple from a process standpoint with the bulk of the work creating a Lab going into the creation of the configuration XML that defines it. But if there is a Lab configuration already available that fits your needs then there is almost nothing to do.
@@ -55,20 +77,68 @@ A Lab consists of the following items:
 
 There are a library of DSC configuration files for various machine types already defined and available for you to use in the **DSCLibrary** folder.
 
-Once these files are available the process of setting up the Lab is simple.
+## Installing the LabBuilder Module
+
+The easiest way to download and install the LabBuilder module is using PowerShell Get to download it from the [PowerShell Gallery](https://www.powershellgallery.com/packages/LabBuilder/):
+```powershell
+Install-Module -Name LabBuilder
+```
+
+PowerShell Get is built into Windows Management Framework 5.0, which is a requirement of this project, so it should already be installed onto your host.
+If it is not installed, download it from [here](https://www.microsoft.com/en-us/download/details.aspx?id=50395).
+
+## Installing a Lab
+
+Once the Lab files are available the process of installing the Lab is simple.
  1. Make a folder where all your Lab files will go (e.g. VMs, VHDs, ISOs, scripts) - e.g. c:\MyLab
- 2. Copy your the Lab Configuration XML file into that folder (try one of the sample configurations in the **Samples** folder).
+ 2. Copy the Lab Configuration XML file into that folder (try one of the sample configurations in the **Samples** folder).
  3. Edit the Lab Configuration XML file and customize the Settings to suit (specifically the LabPath setting). 
  4. Make a folder in your Lab folder for your Windows ISO files called **isofiles** - e.g. c:\MyLab\ISOFiles
  5. Copy any ISO files into this folder that your lab will use.
  6. Make a folder in your Lab folder for your VHD boot templates (converted from the ISO files) **vhdfiles** - e.g. c:\MyLab\VHDFiles
- 7. Run the following commands in an Administrative PowerShell window:
+ 7. Run the following command in an Administrative PowerShell window:
 ```powershell
-Import-Module LabBuilder
 Install-Lab -ConfigPath 'c:\MyLab\Configuration.xml'
 ```
 
 This will create a new Lab using the c:\MyLab\Configuration.xml file.
+
+If you want more verbose output of what is happening during the Lab Install process, use the -verbose parameter:
+```powershell
+Install-Lab -ConfigPath 'c:\MyLab\Configuration.xml' -Verbose
+```
+
+## Stopping a Lab
+
+Once the Lab has been installed, it can be stopped using this PowerShell command:
+
+```powershell
+Get-Lab -ConfigPath 'c:\MyLab\Configuration.xml' | Stop-Lab
+```
+
+This will shutdown any running Virutal Machines in the Lab in **Reverse Boot Order**, starting with Virtual Machines that have no boot order defined.
+LabBuilder will wait for all machines with the same Boot Order to be shut down before beginning shut down of VMs in the next lowest Boot Order.
+Any Lab Virtual Machine that has already been stopped will be ignored.
+
+_Note: Boot Order is an optional attribute defined in the Lab Configuration that controls the order Lab Virtual Machines should be booted in._
+
+You can of course just shut down the Virtual Machines in a Lab yourself via Hyper-V (or some other mechanism), but using Stop-Lab ensures the Virtual Machines are shutdown in a specific order defined in the Lab (e.g. Domain Controllers shut down last).
+
+
+## Starting a Lab
+
+Once the Lab has been installed and then stopped, it can be started back up using this PowerShell command:
+
+```powershell
+Get-Lab -ConfigPath 'c:\MyLab\Configuration.xml' | Start-Lab
+```
+
+This will start up any stopped Virutal Machines in the Lab in **Boot Order**, with Virtual Machines that have no boot order defined being started last.
+LabBuilder will wait for all machines with the same Boot Order to be started up fully before beginning start up of VMs in the next highest Boot Order.
+
+_Note: Boot Order is an optional attribute defined in the Lab Configuration that controls the order Lab Virtual Machines should be booted in._
+
+You can of course just start up the Virtual Machines in a Lab yourself via Hyper-V (or some other mechanism), but using Start-Lab ensures the Virtual Machines are started up in a specific order defined in the Lab (e.g. Domain Controllers started up first).
 
 
 ISO Files
@@ -96,410 +166,141 @@ The conversion process for a single ISO to VHD can take 10-20 minutes depending 
 For this reason multiple Labs can be configured to use the same path to store these VHDs by changing the _vhdpath_ attribute of the _<templatevhds>_ node in the configuration. 
 
 
-Requirements
-============
-To use this Module you will require on your Lab Host:
- 1. Operating Systems supported:
-    - Windows Server 2012
-    - Windows Server 2012 R2
-    - Windows Server 2016 TP4
-    - Windows 8.0
-    - Windows 8.1
-    - Windows 10
- 2. Hyper-V available (which requires intel-VT CPU support).
- 3. To use labs that contain Nested Hyper-V hosts only Windows 10 built 10586 or later and Windows Server 2016 TP3 or later are supported.
- 4. Copies of the Windows installation media for any Operating Systems that will be used in your Labs.
-    * Note: Many Lab configuration files can contain a URL where the relevant trial media can be downloaded from.
+Lab Installation Process in Detail
+==================================
+When a new Lab is installed onto a Lab Host from a configuration file, LabBuilder performs the following tasks (in order):
+ 1. **Load Config**: The Lab configuration file is Loaded and validated.
+
+   _If the Lab Configuration file is invalid it will be rejected and the Lab will not be installed._
+
+ 2. **Create Lab Folder**: A folder on the Lab Host is created to store the Lab files (VM Templates, VMs, Resources etc.).
+
+  _The user specifies the location of this folder in the Lab Configuration file or by passing the LabPath parameter to the Install-Lab cmdlet._
+
+ 3. **Download Modules**: All Module Resources listed in the Lab Configuration are downloaded to the PowerShell Modules folder if they don't already exist.
+ 4. **Download MSUs**: All MSU Resources listed in the Lab Configuration are downloaded to the Resources folder in the Lab folder if they don't already exist. 
+ 5. **Create Lab Switches**: Each Virtual Switch specified in the Lab Configuration is created or updated in Hyper-V.
+ 6. **Create Management Switch**: A Management Internal Virtual Switch is created in Hyper-V for this Lab.
+
+   _Each Lab has it's own Management Internal Virtual Switch which will be named "Lab Management" with the Lab ID prepended to it._
+   _It will be assigned a VLAN Id of 99, which can be overridden in the Lab Configuration file._
+   _The Lab Management switch is for the Lab Host to communicate with the Lab Guest Virtual Machines so must not be removed._
+
+ 7. **Create Template VHDs**: Any Template VHD files that don't exist but should are created from the appropriate ISO files.
+
+    _A Lab Configuration file may not list any Template VHD files, or it may list them but not specify source ISO files to create the VHD files from._
+    _Instead the Templates may directly link to a VHD file or an existing Hyper-V Virtual Machine._ 
+
+ 8. **Create VHD Templates Folder**: A folder within the Lab folder will be created to store the Virtual Hard Disk Template files.
+
+    _This folder is usually called 'Virtual Hard Disk Templates'._
+    _This folder will be used to store Template VHD files or Differencing Disk Parent VHD files for use as a Boot Disk for Lab Virtual Machines._
+    _A VHD file in this folder can be used as a Template or a Differencing Disk Parent or both._
+
+ 9. **Copy VHD Templates**: Get the list of Templates in the Lab Configuration and copy the VHD specified to the Lab Virtual Hard Disk Templates folder.
+
+   _Any packages listed in the Template will be applied to the Template at this point._
+   _A Template VHD file will only be copied into this folder if it does not already exist._
+   _The Template VHD file will also be optimized in this folder and then marked as Read Only to ensure it is not changed (as it may be used as a Differencing Disk Parent)._
+
+ 10. **Create Virtual Machines**: Create the Lab Virtual Machines, one at a time, for each one performing the following steps:
+     
+     1. **Create Hyper-V VM**: Create the Virtual Machine and attach any Network Adapters listed in the Lab Configuration with it.
+     2. **Create Boot VHD**: Copy (if not using a Differencing Boot VHD) the Boot VHD from the Virtual Hard Disk Templates folder and attach it to the VM.
+     3. **Add Packages**: Add any listed packages to the VM.
+     4. **Create Data VHDs**: Copy/Create and attach any Data VHDs listed in the Lab Configuration with the VM.
+     5. **Create Config Files**: Create any VM configuration files required for first boot of the VM (e.g. Unattend.xml, SetupComplete.cmd) and copy them into the Boot VHD.  
+     6. **Boot VM**: Boot the VM for the first time and wait for Initial Setup of the VM to complete.
+     7. **Create Certificate**: A Self-Signed certificate will be created by the VM and made available on the VM Boot VHD.
+     8. **Download Certificate**: The Self-Signed certificate will be downloaded by the Lab Host and used to encrypt the credentials in the DSC MOF file that will be created.
+     9. **Create DSC Configuration**: The DSC Configuration file will be assembled from the speficied DSC Configuration and the required networking information.
+     10. **Compile DSC Configuration**: The DSC Configuration file will be compiled and a MOF file produced.
+     11. **Upload DSC Files**: This DSC MOF file, DSC LCM (Meta) MOF File and any DSC Resource Modules required will be uploaded into the VM.
+     12. **Start DSC**: DSC configuration will be started on the VM.
+
+         _Note: The LCM is configured to re-apply DSC every 15 minutes, so changing any settings managed by DSC on the server will be reverted within 15 minutes of them being changed._
+
+The entire process above is automated.
+As long as you a valid Lab Configuration file and any required Windows Installation Media ISO files then the Lab will be installed for you.
+Depending on the size of the Lab you are building and whether or not the ISO files need to be converted to VHD files, this could take from 5 minutes to many hours.
+For example, an Lab containing eight Windows Server 2012 R2 Virtual Machines configured as an AD Domain containing various services installed on a Host with four CPU cores, 32 GB RAM and an SSD will take about 45 minutes to install.
+
+
+Windows Management Framework 5.0 (WMF 5.0)
+==========================================
+All Lab Guest Virtual Machines must have WMF 5.0 installed onto them before they are first booted in a Lab environment. This is to ensure the Self-Signed certificate can be generated and returned to the host for DSC MOF encryption.
+
+If WMF 5.0 is not installed before the Lab VM Guest first boot then DSC configuration will not proceed, and the Lab Guest VM will boot with a clean OS, but none of the specific features installed or configured (e.g. DC's not promoted).
+
+WMF 5.0 is only required to be installed onto Windows 7, 8 and 8.1 or Windows Server 2008 R2, Windows Server 2012 and Windows Server 2012 R2. Windows 10 and Windows Server 2016 already include WMF 5.0 so it doesn't need to be installed.
+
+_Most Labs_ are configured to install WMF 5.0 **completely automatically** so you don't need to install worry about it.
+
+Note: It is possible to change a Lab Configuration file to prevent automatic installation of the WMF 5.0 MSU package onto Guest Lab VM's, but this is not recommended unless there is a good reason for doing so.
+
+LabBuilder supports automatically installing any MSU package that can be downloaded from the internet onto the Lab Guest VMs during installation of the Lab.
+These MSU packages can be installed during any of the following phases of Lab installation:
+ - Convert Windows Install Media ISO to Template VHD.
+ - Copy Template VHD to ParentVHD folder in Lab.
+ - Create new VM Boot VHD from ParentVHD folder in Lab.
+ 
+ By default, Lab configuration files are configured to ensure WMF 5.0 is installed at each of the above phases.
+ 
+ The WMF 5.0 MSU package is controlled by adding a new MSU element to the &lt;Resources&gt; element in a Lab Configuration.
+ E.g.
+```xml
+     <msu name="WMF5.0-WS2012R2-W81"
+         url="https://download.microsoft.com/download/2/C/6/2C6E1B4A-EBE5-48A6-B225-2D2058A9CEFB/Win8.1AndW2K12R2-KB3134758-x64.msu" />
+```
+
+This defines the name of the MSU package and the Download location.
+The package can then be added to the &lt;Template&gt;, &lt;TemplateVHD&gt; or &lt;VM&gt; element in the **Packages** attribute.
+E.g.
+```xml
+<templatevhd name="Windows Server 2012 R2 Datacenter Full"
+                iso="9600.16384.130821-1623_x64fre_Server_EN-US_IRM_SSS_DV5.iso"
+                url="https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2012-r2"
+                vhd="Windows Server 2012 R2 Datacenter Full.vhdx" 
+                edition="Windows Server 2012 R2 SERVERDATACENTER" 
+                ostype="Server"
+                packages="WMF5.0-WS2012R2-W81"
+                vhdformat="vhdx" 
+                vhdtype="dynamic" 
+                generation="2" 
+                vhdsize="40GB" />
+```
+
+Other MSU packages can also be installed in the same way.
+Multiple MSU Packages can be installed to the same VHD by comma delimiting the Packages attribute.
 
 
 Configuration XML
 =================
+Documentation for the LabBuilder Configuration XML can be found in the file [docs/labbuilderconfig-schema.md](LabBuilder/docs/labbuilderconfig-schema.md).
 
 
 Cmdlets
 =======
+Complete documentation for the LabBuilder Lab Cmdlets can be found in the file [docs/cmdlets-lab.md](LabBuilder/docs/cmdlets-lab.md).
 
-Install-Lab
------------
-### SYNOPSIS
-Installs or Update a Lab.
-
-### DESCRIPTION
-This cmdlet will install an entire Hyper-V lab environment defined by the
-LabBuilder configuration file provided.
-
-If components of the Lab already exist, they will be updated if they differ
-from the settings in the Configuration file.
-
-The Hyper-V component can also be optionally installed if it is not.
-
-### PARAMETER ConfigPath
-The path to the LabBuilder configuration XML file.
-
-### PARAMETER LabPath
-The optional path to install the Lab to - overrides the LabPath setting in the
-configuration file.
-
-### PARAMETER Lab
-The Lab object returned by Get-Lab of the lab to install.    
-
-### PARAMETER CheckEnvironment
-Whether or not to check if Hyper-V is installed and install it if missing.
-
-### EXAMPLE
-```powershell
-Install-Lab -ConfigPath c:\mylab\config.xml
+A list of Cmdlets in the LabBuilder module can be found by running the following PowerShell commands:
+```PowerShell
+Import-Module LabBuilder
+Get-Command -Module LabBuilder
 ```
-Install the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
 
-### EXAMPLE
-```powershell
-Get-Lab -ConfigPath c:\mylab\config.xml | Install-Lab
+Help on individual Cmdlets can be found in the built-in Cmdlet help:
+```PowerShell
+Get-Help -Name Install-Lab
 ```
-Install the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
 
-### OUTPUTS
-None
 
-
-Update-Lab
-----------
-### SYNOPSIS
-Update a Lab.
-
-### DESCRIPTION
-This cmdlet will update the existing Hyper-V lab environment defined by the
-LabBuilder configuration file provided.
-
-If components of the Lab are missing they will be added.
-
-If components of the Lab already exist, they will be updated if they differ
-from the settings in the Configuration file.
-
-### PARAMETER ConfigPath
-The path to the LabBuilder configuration XML file.
-
-### PARAMETER LabPath
-The optional path to update the Lab in - overrides the LabPath setting in the
-configuration file.
-
-### PARAMETER Lab
-The Lab object returned by Get-Lab of the lab to update.    
-
-### EXAMPLE
-```powershell
-Update-Lab -ConfigPath c:\mylab\config.xml
-```
-Update the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### EXAMPLE
-```powershell
-Get-Lab -ConfigPath c:\mylab\config.xml | Update-Lab
-```
-Update the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### OUTPUTS
-None
-
-
-Uninstall-Lab
--------------
-### SYNOPSIS
-Uninstall the components of an existing Lab.
-
-### DESCRIPTION
-This function will attempt to remove the components of the lab specified
-in the provided LabBuilder configuration file.
-
-It will always remove any Lab Virtual Machines, but can also optionally
-remove:
-Switches
-VM Templates
-VM Template VHDs
-
-### PARAMETER ConfigPath
-The path to the LabBuilder configuration XML file.
-
-### PARAMETER LabPath
-The optional path to uninstall the Lab from - overrides the LabPath setting in the
-configuration file.
-
-### PARAMETER Lab
-The Lab object returned by Get-Lab of the lab to uninstall. 
-
-### PARAMETER RemoveSwitch
-Causes the switches defined by this to be removed.
-
-### PARAMETER RemoveVMTemplate
-Causes the VM Templates created by this to be be removed. 
-
-### PARAMETER RemoveVMFolder
-Causes the VM folder created to contain the files for any the
-VMs in this Lab to be removed.
-
-### PARAMETER RemoveVMTemplateVHD
-Causes the VM Template VHDs that are used in this lab to be
-deleted.
-
-### PARAMETER RemoveLabFolder
-Causes the entire folder containing this Lab to be deleted.
-
-### EXAMPLE
-```powershell
-Uninstall-Lab `
-    -Path c:\mylab\config.xml `
-    -RemoveSwitch`
-    -RemoveVMTemplate `
-    -RemoveVMFolder `
-    -RemoveVMTemplateVHD `
-    -RemoveLabFolder
-```
-Completely uninstall all components in the lab defined in the
-c:\mylab\config.xml LabBuilder configuration file.
-
-### EXAMPLE
-```powershell
-Get-Lab -ConfigPath c:\mylab\config.xml | Uninstall-Lab `
-    -RemoveSwitch`
-    -RemoveVMTemplate `
-    -RemoveVMFolder `
-    -RemoveVMTemplateVHD `
-    -RemoveLabFolder
-```
-Completely uninstall all components in the lab defined in the
-c:\mylab\config.xml LabBuilder configuration file.
-
-### OUTPUTS
-None
-
-
-Start-Lab
----------
-### SYNOPSIS
-Starts an existing Lab.
-
-### DESCRIPTION
-This cmdlet will start all the Hyper-V virtual machines definied in a Lab
-configuration.
-
-It will use the Bootorder attribute (if defined) for any VMs to determine
-the order they should be booted in. If a Bootorder is not specified for a
-machine, it will be booted after all machines with a defined boot order.
-
-The lower the Bootorder value for a machine the earlier it will be started
-in the start process.
-
-Machines will be booted in series, with each machine starting once the
-previous machine has completed startup and has a management IP address.
-
-If a Virtual Machine in the Lab is already running, it will be ignored
-and the next machine in series will be started.
-
-If more than one Virtual Machine shares the same Bootorder value, then
-these machines will be booted in parallel, with the boot process only
-continuing onto the next Bootorder when all these machines are booted.
-
-If a Virtual Machine specified in the configuration is not found an
-exception will be thrown.
-
-If a Virtual Machine takes longer than the StartupTimeout then an exception
-will be thown but the Start process will continue.
-
-If a Bootorder of 0 is specifed then the Virtual Machine will not be booted at
-all. This is useful for things like Root CA VMs that only need to started when
-the Lab is created.
-
-### PARAMETER ConfigPath
-The path to the LabBuilder configuration XML file.
-
-### PARAMETER LabPath
-The optional path to install the Lab to - overrides the LabPath setting in the
-configuration file.
-
-### PARAMETER Lab
-The Lab object returned by Get-Lab of the lab to start.     
-
-### PARAMETER StartupTimeout
-The maximum number of seconds that the process will wait for a VM to startup.
-Defaults to 90 seconds.
-
-### EXAMPLE
-```powershell
-Start-Lab -ConfigPath c:\mylab\config.xml
-```
-Start the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### EXAMPLE
-```powershell
-Get-Lab -ConfigPath c:\mylab\config.xml | Start-Lab
-```
-Start the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### OUTPUTS
-None
-    
-
-Stop-Lab
---------
-### SYNOPSIS
-Stop an existing Lab.
-
-### DESCRIPTION
-This cmdlet will stop all the Hyper-V virtual machines definied in a Lab
-configuration.
-
-It will use the Bootorder attribute (if defined) for any VMs to determine
-the order they should be shutdown in. If a Bootorder is not specified for a
-machine, it will be shutdown before all machines with a defined boot order.
-
-The higher the Bootorder value for a machine the earlier it will be shutdown
-in the stop process.
-
-The Virtual Machines will be shutdown in REVERSE Bootorder.
-
-Machines will be shutdown in series, with each machine shutting down once the
-previous machine has completed shutdown.
-
-If a Virtual Machine in the Lab is already shutdown, it will be ignored
-and the next machine in series will be shutdown.
-
-If more than one Virtual Machine shares the same Bootorder value, then
-these machines will be shutdown in parallel, with the shutdown process only
-continuing onto the next Bootorder when all these machines are shutdown.
-
-If a Virtual Machine specified in the configuration is not found an
-exception will be thrown.
-
-If a Virtual Machine takes longer than the ShutdownTimeout then an exception
-will be thown but the Stop process will continue.
-
-### PARAMETER ConfigPath
-The path to the LabBuilder configuration XML file.
-
-### PARAMETER LabPath
-The optional path to install the Lab to - overrides the LabPath setting in the
-configuration file.
-
-### PARAMETER Lab
-The Lab object returned by Get-Lab of the lab to start.     
-
-### PARAMETER ShutdownTimeout
-The maximum number of seconds that the process will wait for a VM to shutdown.
-Defaults to 30 seconds.
-
-### EXAMPLE
-```powershell
-Stop-Lab -ConfigPath c:\mylab\config.xml
-```
-Stop the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### EXAMPLE
-```powershell
-Get-Lab -ConfigPath c:\mylab\config.xml | Stop-Lab
-```
-Stop the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
-
-### OUTPUTS
-None
-
-
-Versions
-========
-### 0.5.0.0
-* BREKAING: Renamed Config parameter to Lab parameter to indicate the object is actually an object that also stores Lab state information.
-* Remove-LabVM: Removed parameter 'RemoveVHDs'. Added parameter RemoveVMFolder which causes the VM folder and all contents to be deleted.
-* Uninstall-Lab: Renamed "Remove" parameters to be singular names rather than plural.
-* Uninstall-Lab: Added parameter 'RemoveLabFolder' which will cause the entire Lab folder to be deleted.
-* Uninstall-Lab: Added ShouldProcess support to ask user to confirm actions.
-* Update-Lab: Added function which just calls Install-Lab.
-* Start-LabVM: Renamed function to Install-LabVM so that it is not confused with Start-VM.
-* *-LabSwitch: Added Name array parameter to allow filtering of switches to work with.
-* *-LabVMTemplateVHD: Added Name array parameter to allow filtering of VM Template VHDs to work with.
-* *-LabVMTemplate: Added Name array parameter to allow filtering of VM Templates to work with.
-* *-LabVM: Added Name array parameter to allow filtering of VMs to work with.
-* Samples: Updated sample code with additional examples.
-* Help completed for all exported cmdlets.
-* Get-LabVM: XML now validated against labbuilderconfig-schema.xsd in Schemas folder when loaded -unless SkipXMLValidation switch is passed.
-* All sample and test configuration XML files validated against labbuilderconfig-schema.xsd in schemas folder when unit tests run.
-* All sample and test configuration XML files updated with namespace -> xmlns="labbuilderconfig".
- 
-### 0.4.2.0
-* Add bootorder VM attribute for controlling stop-lab/start-lab order.
-* Added Start-Lab and Stop-Lab cmdlets.
-* *-Lab cmdlet documentation added to Readme.md
-
-### 0.4.1.0
-* VHDParentPath setting made optional. Defaults to "Virtual Machine Hard Disks" under config.
-* Initialize-LabConfiguration function will create labpath and vhdparentpath folders if not exist.
-* Removed Test-LabConfiguration function and tests moved to Get-LabConfiguration.
-* Added Disconnect-LabVM function to disconnect from a connect Lab VM.
-* Fixed bug setting TrustedHosts when connecting to Lab VM.
-* Added code to revert TrustedHosts when disconnecting from Lab VM. 
-* All non-exported supporting functions moved into separate support libraries.
-* Add support for LabId setting that gets prepended to Lab resources.
-* Added LabBuilderConfig schema in schema folder.
-* Added LabPath parameter to Install-Lab, Uninstall-Lab and Get-LabConfiguration.
-* Fix exception in Disconnect-LabVM.
-* Fixed Unit tests to retain current folder location.
-* Added PS ScriptAnalyzer Error tests to unit tests.
-* Display PS ScriptAnalyzer Warnings when unit tests run.
-* Remove-LabVMTemplateVHD function added and will be called from Uninstall-Lab.
-
-### 0.4.0.0
-* Some secondary non-exported functions moved into separate support libraries.
-* Initialize-LabVMTemplate caches NanoServerPackages from VHD template folder to Lab folder.
-* Fix exception connecting to VM when TrustedHosts is set to '*'.
-* Fix path Lab VM files are created. 
-* Support for creating Certificates for Nano Servers on the host added.
- 
-### 0.3.3.0
-* Changed Get-LabSwitch Unit tests to use PesterTestConfig.OK.xml.
-* Added support for configuring Nano Server packages for each VM.
-* Removed MAC Address minimum/maximum value settings from configuration.
-* Fix bug with Wait-LabInitVM failing to copy InitialSetupComplete.txt file.
-* Added VMRootPath and LabBuilderFilesPath properties Get-LabVM array containing path where VM and LabBuilder files should be stored respectively.
-* Added TemplateVHD in templates/template config node for specifying the template VHD. 
-
-### 0.3.2.0
-* Added Initialize-VHD function.
-* Added support for formatting Data VHDs.
-* Added support for copying multiple folders to DataVHDs.
-* Updated Download-ResourceModule to use DownloadAndUnzipFile function.
-* Changed name of Settings\VMPath attribute to LabPath. 
-
-### 0.3.1.0
-* Disable 'Access Denied' test when connecting to new VM because this error is reported by VM that is still booting up.
-* Correct Verbose message shown when Integration Services enabled.
-* Added Verbose message to indicate creation of VM Initialization files.
-* Correct Verbose message not appearing when mounting VM boot disk image file.
-* Moved DSC Config message into Localization data.
-* Disabled automatic module push to PSGallery till version 1.0.0.0 or greater.
-
-### 0.3.0.0
-* Fix to Module detection regex.
-* Updated AppVeyor.yml to push more artifacts.
-* Fix issue preventing timeout from triggering.
-* Improved handling of Remoting connection by moving into a new function Connect-LabVM
-* IP Address of VMs automatically added to WS-Man Trusted Hosts to enable HTTP remoting connection.
-* Prevent error if Panther folder doesn't exist in VHD image when creating a new VM.
-* Add support for multiple data disks for each VM.
-* Add support for creating new data disks by cloning exising VHDs.
-* Support for Fixed, Differencing and Shared data disks.
-* JSON Object comparison unit tests fixed.
-* AppVeyor build status badge added.
-* Add support for VM Integration Services flag.
-* Initialize-Lab* arrays made optional and will be pulled from config if not passed.
-* Configuration parameter changed to Config to reduce size/typing.
-* Support for creating VHD boot disks from ISO via TemplateVHD nodes in XML.
-
-### 0.2.0.0
-* Code cleanup and refactoring.
-
-### 0.1.0.0
-* Initial Release.
+Change List
+===========
+For a list of changes to versions, see the [docs/changelist.md](LabBuilder/docs/changelist.md) file.
 
 
 Links
------
+=====
 - [GitHub Repository](https://github.com/PlagueHO/LabBuilder/)
 - [Blog](https://dscottraynsford.wordpress.com/)

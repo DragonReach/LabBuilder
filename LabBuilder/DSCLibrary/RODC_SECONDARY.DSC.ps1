@@ -1,72 +1,73 @@
-<#########################################################################################################################################
+<###################################################################################################
 DSC Template Configuration File For use by LabBuilder
 .Title
-	RODC_SECONDARY
+    RODC_SECONDARY
 .Desription
-	Builds a Read Only Domain Controller and adds it to the existing domain provided in the Parameter DomainName.
-	The RODC will not be installed at the moment because the xActiveDirectory DSC Resource does not support RODC.
-	The RODC will not be installed at the moment because the xActiveDirectory DSC Resource does not support RODC.
-.Parameters:          
-	DomainName = "LABBUILDER.COM"
-	DomainAdminPassword = "P@ssword!1"
-#########################################################################################################################################>
+    Builds a Read Only Domain Controller and adds it to the existing domain provided in the Parameter DomainName.
+    The RODC will not be installed at the moment because the xActiveDirectory DSC Resource does not support RODC.
+.Parameters:
+    DomainName = "LABBUILDER.COM"
+    DomainAdminPassword = "P@ssword!1"
+    DCName = 'SA-DC1'
+    PSDscAllowDomainUser = $True
+###################################################################################################>
 
 Configuration RODC_SECONDARY
 {
-	Import-DscResource -ModuleName 'PSDesiredStateConfiguration' -ModuleVersion 1.1
-	Import-DscResource -ModuleName xActiveDirectory 
-	Node $AllNodes.NodeName {
-		# Assemble the Local Admin Credentials
-		If ($Node.LocalAdminPassword) {
-			[PSCredential]$LocalAdminCredential = New-Object System.Management.Automation.PSCredential ("Administrator", (ConvertTo-SecureString $Node.LocalAdminPassword -AsPlainText -Force))
-		}
-		If ($Node.DomainAdminPassword) {
-			[PSCredential]$DomainAdminCredential = New-Object System.Management.Automation.PSCredential ("$($Node.DomainName)\Administrator", (ConvertTo-SecureString $Node.DomainAdminPassword -AsPlainText -Force))
-		}
+    Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
+    Import-DscResource -ModuleName xActiveDirectory
+    Node $AllNodes.NodeName {
+        # Assemble the Local Admin Credentials
+        If ($Node.LocalAdminPassword) {
+            [PSCredential]$LocalAdminCredential = New-Object System.Management.Automation.PSCredential ("Administrator", (ConvertTo-SecureString $Node.LocalAdminPassword -AsPlainText -Force))
+        }
+        If ($Node.DomainAdminPassword) {
+            [PSCredential]$DomainAdminCredential = New-Object System.Management.Automation.PSCredential ("$($Node.DomainName)\Administrator", (ConvertTo-SecureString $Node.DomainAdminPassword -AsPlainText -Force))
+        }
 
         WindowsFeature BackupInstall
         { 
             Ensure = "Present" 
-            Name = "Windows-Server-Backup" 
+            Name   = "Windows-Server-Backup" 
         } 
 
         WindowsFeature DNSInstall 
         { 
             Ensure = "Present" 
-            Name = "DNS" 
+            Name   = "DNS" 
         } 
 
         WindowsFeature ADDSInstall 
         { 
-            Ensure = "Present" 
-            Name = "AD-Domain-Services" 
+            Ensure    = "Present" 
+            Name      = "AD-Domain-Services" 
             DependsOn = "[WindowsFeature]DNSInstall" 
         } 
         
         WindowsFeature RSAT-AD-PowerShellInstall
         {
-            Ensure = "Present"
-            Name = "RSAT-AD-PowerShell"
+            Ensure    = "Present"
+            Name      = "RSAT-AD-PowerShell"
             DependsOn = "[WindowsFeature]ADDSInstall"
         }
 
-        xWaitForADDomain DscDomainWait
+        # Wait for the Domain to be available so we can join it.
+        WaitForAll DC
         {
-            DomainName = $Node.DomainName
-            DomainUserCredential = $DomainAdminCredential 
-            RetryCount = 100 
-            RetryIntervalSec = 10 
-            DependsOn = "[WindowsFeature]ADDSInstall"
+            ResourceName     = '[xADDomain]PrimaryDC'
+            NodeName         = $Node.DCname
+            RetryIntervalSec = 15
+            RetryCount       = 60
         }
         
 <#
-		xADDomainController SecondaryDC
+        xADDomainController SecondaryDC
         {
             DomainName = $Node.DomainName
             DomainAdministratorCredential = $DomainAdminCredential
             SafemodeAdministratorPassword = $LocalAdminCredential 
             DependsOn = "[xWaitForADDomain]DscDomainWait"
-        }	
+        }
 #>
-	}
+    }
 }

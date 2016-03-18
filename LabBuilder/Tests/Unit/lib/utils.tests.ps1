@@ -43,11 +43,6 @@ InModuleScope LabBuilder {
             -ArgumentList $exception, $errorId, $errorCategory, $null
         return $errorRecord
     }
-    
-    
-    
-    Describe 'IsAdmin' -Tag 'Incomplete' {
-    }
 
 
 
@@ -153,7 +148,7 @@ InModuleScope LabBuilder {
 
 
 
-    Describe 'DownloadModule' {
+    Describe 'DownloadResourceModule' {
         $URL = 'https://github.com/PowerShell/xNetworking/archive/dev.zip'
         
         Mock Get-Module -MockWith { @( New-Object -TypeName PSObject -Property @{ Name = 'xNetworking'; Version = '2.4.0.0'; } ) }
@@ -168,7 +163,7 @@ InModuleScope LabBuilder {
         Context 'Correct module already installed; Valid URL and Folder passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev'
@@ -190,7 +185,7 @@ InModuleScope LabBuilder {
         Context 'Module is not installed; Valid URL and Folder passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev'
@@ -211,7 +206,7 @@ InModuleScope LabBuilder {
         Context 'Module is not installed; No URL or Folder passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking'
                 } | Should Not Throw
             }
@@ -230,7 +225,7 @@ InModuleScope LabBuilder {
         Context 'Wrong version of module is installed; Valid URL, Folder and Required Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev' `
@@ -252,7 +247,7 @@ InModuleScope LabBuilder {
         Context 'Wrong version of module is installed; No URL or Folder passed, but Required Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -RequiredVersion '2.5.0.0'
                 } | Should Not Throw
@@ -271,7 +266,7 @@ InModuleScope LabBuilder {
         Context 'Correct version of module is installed; Valid URL, Folder and Required Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev' `
@@ -292,7 +287,7 @@ InModuleScope LabBuilder {
         Context 'Correct version of module is installed; No URL and Folder passed, but Required Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -RequiredVersion '2.4.0.0'
                 } | Should Not Throw
@@ -311,7 +306,7 @@ InModuleScope LabBuilder {
         Context 'Wrong version of module is installed; Valid URL, Folder and Minimum Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev' `
@@ -333,7 +328,7 @@ InModuleScope LabBuilder {
         Context 'Wrong version of module is installed; No URL and Folder passed, but Minimum Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -MinimumVersion '2.5.0.0'
                 } | Should Not Throw
@@ -352,7 +347,7 @@ InModuleScope LabBuilder {
         Context 'Correct version of module is installed; Valid URL, Folder and Minimum Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev' `
@@ -373,7 +368,7 @@ InModuleScope LabBuilder {
         Context 'Correct version of module is installed; No URL and Folder passed, but Minimum Version passed' {
             It 'Does not throw an Exception' {
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -MinimumVersion '2.4.0.0'
                 } | Should Not Throw
@@ -402,7 +397,7 @@ InModuleScope LabBuilder {
                 $Exception = GetException @ExceptionParameters
 
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -URL $URL `
                         -Folder 'xNetworkingDev'
@@ -431,7 +426,7 @@ InModuleScope LabBuilder {
                 $Exception = GetException @ExceptionParameters
 
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xDoesNotExist'
                 } | Should Throw $Exception
             }
@@ -458,7 +453,7 @@ InModuleScope LabBuilder {
                 $Exception = GetException @ExceptionParameters
 
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -RequiredVersion '2.5.0.0'
                 } | Should Throw $Exception
@@ -485,7 +480,7 @@ InModuleScope LabBuilder {
                 $Exception = GetException @ExceptionParameters
 
                 {
-                    DownloadModule `
+                    DownloadResourceModule `
                         -Name 'xNetworking' `
                         -MinimumVersion '2.5.0.0'
                 } | Should Throw $Exception
@@ -499,22 +494,6 @@ InModuleScope LabBuilder {
                 Assert-MockCalled Remove-Item -Exactly 0
                 Assert-MockCalled Get-PackageProvider -Exactly 1
                 Assert-MockCalled Install-Module -Exactly 1
-            }
-        }
-    }
-
-
-
-    Describe 'DownloadResources' -Tags 'Incomplete' {
-        $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
-
-        Context 'Valid configuration is passed' {
-            Mock DownloadModule
-            It 'Does not throw an Exception' {
-                { DownloadResources -Lab $Lab } | Should Not Throw
-            }
-            It 'Should call appropriate Mocks' {
-                Assert-MockCalled DownloadModule -Exactly 4
             }
         }
     }
