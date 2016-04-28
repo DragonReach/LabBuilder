@@ -33,9 +33,9 @@ ConvertFrom-StringData -StringData @'
     EmptyTemplateNameError=Template Name is missing or empty.
     TemplateSourceVHDAndTemplateVHDConflictError=Both the Template SourceVHD and TemplateVHD parameters are set for Template '{0}'. Only one of these may be set for each Template.
     TemplateSourceVHDandTemplateVHDMissingError=Either the Template SourceVHD or TemplateVHD parameter must be set in Template '{0}'.
-    TemplateTemplateVHDNotFoundError=The Template Template VHD '{1}' in Template '{0}' could not be found.
+    TemplateTemplateVHDNotFoundError=The Template VHD '{1}' in Template '{0}' could not be found.
     TemplateSourceVHDNotFoundError=The Template Source VHD '{1}' in Template '{0}' could not be found.
-    DSCModuleDownloadError=Module '{2}' required by DSC Config File '{0}' in VM '{1}' could not be found or downloaded.					
+    DSCModuleDownloadError=Module '{2}' required by DSC Config File '{0}' in VM '{1}' could not be found or downloaded.
     DSCModuleNotFoundError=Module '{2}' required by DSC Config File '{0}' in VM '{1}' could not be found in the module path.
     CertificateCreateError=The self-signed certificate for VM '{0}' could not be created and downloaded.
     CertificateDownloadError=The self-signed certificate for VM '{0}' could not be downloaded.
@@ -83,6 +83,7 @@ ConvertFrom-StringData -StringData @'
     VMDVDDriveISOResourceNotFOundError=The ISO Resource '{1}' to be mounted into a Virtual DVD Drive specified in VM '{0}' does not exist.
     NanoServerPackagesFolderMissingError=The NanoServerPackages folder '{0}' does not exist.
     VMDoesNotExistError=The VM '{0}' does not exist.
+    VMVirtualizationExtError=The VM '{0}' requires Virtualization Extensions to be exposed, but this is not supported by your version of Windows. Either set the ExposeVirtualizationExtensions attribute to 'N' for the VM or update to a Windows Build 10565 or above.
     NanoPackageNotFoundError=The Nano Server Package '{0}' could not be found.
     PackageNotFoundError=The Package MSU '{0}' is not listed in the Lab Resource MSU list.
     PackageMSUNotFoundError=The file '{1}' for Package MSU '{0}' does not exist.
@@ -94,6 +95,7 @@ ConvertFrom-StringData -StringData @'
     ConvertWindowsImageError=An error occured converting {2} in '{1}' from ISO File '{0}' to a bootable {3}; {4}.
     BindingAdapterNotFoundError=A physical network adapter {1}was not found to bind to the External Switch {0}.
     BindingAdapterUsedError=Error binding physical network adapter '{1}' to External Swtich '{0}' because it is already bound to another External Switch.
+    IPAddressError=The IP Address '{0}' is invalid.
 
     ImportingLibFileMessage=Importing function library '{0}'.
     InstallingHyperVComponentsMesage=Installing {0} Hyper-V Components.
