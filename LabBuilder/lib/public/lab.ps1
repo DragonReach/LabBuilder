@@ -87,6 +87,20 @@ function Get-Lab {
     $Lab.PreserveWhitespace = $true
     $Lab.LoadXML($Content)
 
+    # Check the Required Windows Build
+    $RequiredWindowsBuild = $Lab.labbuilderconfig.settings.requiredwindowsbuild
+    if ($RequiredWindowsBuild -and `
+        ($Script:CurrentBuild -lt $RequiredWindowsBuild))
+    {
+        $ExceptionParameters = @{
+            errorId = 'RequiredBuildNotMetError'
+            errorCategory = 'InvalidArgument'
+            errorMessage = $($LocalizedData.RequiredBuildNotMetError `
+                -f $Script:CurrentBuild,$RequiredWindowsBuild)
+        }
+        ThrowException @ExceptionParameters
+    } # if
+
     # Figure out the Config path and load it into the XML object (if we can)
     # This path is used to find any additional configuration files that might
     # be provided with config
@@ -277,7 +291,8 @@ function New-Lab {
     if (Test-Path -Path $LabPath -Type Container)
     {
         # It does - exit if the user declines
-        if (-not $PSCmdlet.ShouldProcess( ( $LocalizedData.ShouldOverwriteLab `
+        if (-not $PSCmdlet.ShouldProcess( 'LocalHost', `
+            ($LocalizedData.ShouldOverwriteLab `
             -f $LabPath )))
         {
             return
@@ -285,7 +300,7 @@ function New-Lab {
     }
     else
     {
-        Write-Verbose -Message $($LocalizedData.CreatingLabFolderMessage `
+        WriteMessage -Message $($LocalizedData.CreatingLabFolderMessage `
             -f 'LabPath',$LabPath)
 
         New-Item `
@@ -305,7 +320,8 @@ function New-Lab {
     if (Test-Path -Path $ConfigPath)
     {
         # It does - exit if the user declines
-        if (-not $PSCmdlet.ShouldProcess( ( $LocalizedData.ShouldOverwriteLabConfig `
+        if (-not $PSCmdlet.ShouldProcess( 'LocalHost', `
+            ($LocalizedData.ShouldOverwriteLabConfig `
             -f $ConfigPath )))
         {
             return
@@ -388,9 +404,11 @@ function New-Lab {
     The optional path to install the Lab to - overrides the LabPath setting in the
     configuration file.
 .PARAMETER Lab
-    The Lab object returned by Get-Lab of the lab to install.    
+    The Lab object returned by Get-Lab of the lab to install.
 .PARAMETER CheckEnvironment
     Whether or not to check if Hyper-V is installed and install it if missing.
+.PARAMETER Force
+    This will force the Lab to be installed, automatically suppressing any confirmations.
 .EXAMPLE
     Install-Lab -ConfigPath c:\mylab\config.xml
     Install the lab defined in the c:\mylab\config.xml LabBuilder configuration file.
@@ -427,19 +445,47 @@ Function Install-Lab {
 
         [Parameter(
             Position=4)]
-        [Switch] $CheckEnvironment
+        [Switch] $CheckEnvironment,
+
+        [Parameter(
+            Position=5)]
+        [Switch] $Force
     ) # Param
 
     begin
     {
+        # Create a splat array containing force if it is set
+        $ForceSplat = @{}
+        if ($PSBoundParameters.ContainsKey('Force'))
+        {
+            $ForceSplat = @{ Force = $true }
+        } # if
+
         # Remove some PSBoundParameters so we can Splat
         $null = $PSBoundParameters.Remove('CheckEnvironment')
-    
+        $null = $PSBoundParameters.Remove('Force')
+
         if ($CheckEnvironment)
         {
             # Check Hyper-V
-            InstallHyperV
+            InstallHyperV `
+                -ErrorAction Stop
         } # if
+
+        # Ensure WS-Man is enabled
+        EnableWSMan `
+            @ForceSplat `
+            -ErrorAction Stop
+
+        # Install Package Providers
+        InstallPackageProviders `
+            @ForceSplat `
+            -ErrorAction Stop
+
+        # Register Package Sources
+        RegisterPackageSources `
+            @ForceSplat `
+            -ErrorAction Stop
 
         if ($PSCmdlet.ParameterSetName -eq 'File')
         {
@@ -454,13 +500,13 @@ Function Install-Lab {
     {
         # Initialize the core Lab components
         # Check Lab Folder structure
-        Write-Verbose -Message $($LocalizedData.InitializingLabFoldersMesage)
+        WriteMessage -Message $($LocalizedData.InitializingLabFoldersMesage)
 
         # Check folders are defined
         [String] $LabPath = $Lab.labbuilderconfig.settings.labpath
         if (-not (Test-Path -Path $LabPath))
         {
-            Write-Verbose -Message $($LocalizedData.CreatingLabFolderMessage `
+            WriteMessage -Message $($LocalizedData.CreatingLabFolderMessage `
                 -f 'LabPath',$LabPath)
 
             $null = New-Item `
@@ -471,7 +517,7 @@ Function Install-Lab {
         [String] $VHDParentPath = $Lab.labbuilderconfig.settings.vhdparentpathfull
         if (-not (Test-Path -Path $VHDParentPath))
         {
-            Write-Verbose -Message $($LocalizedData.CreatingLabFolderMessage `
+            WriteMessage -Message $($LocalizedData.CreatingLabFolderMessage `
                 -f 'VHDParentPath',$VHDParentPath)
 
             $null = New-Item `
@@ -482,7 +528,7 @@ Function Install-Lab {
         [String] $ResourcePath = $Lab.labbuilderconfig.settings.resourcepathfull
         if (-not (Test-Path -Path $ResourcePath))
         {
-            Write-Verbose -Message $($LocalizedData.CreatingLabFolderMessage `
+            WriteMessage -Message $($LocalizedData.CreatingLabFolderMessage `
                 -f 'ResourcePath',$ResourcePath)
 
             $null = New-Item `
@@ -491,7 +537,7 @@ Function Install-Lab {
         }
 
         # Install Hyper-V Components
-        Write-Verbose -Message $($LocalizedData.InitializingHyperVComponentsMesage)
+        WriteMessage -Message $($LocalizedData.InitializingHyperVComponentsMesage)
 
         # Create the LabBuilder Management Network switch and assign VLAN
         # Used by host to communicate with Lab VMs
@@ -512,7 +558,7 @@ Function Install-Lab {
                 -Name $ManagementSwitchName `
                 -ErrorAction Stop
                 
-            Write-Verbose -Message $($LocalizedData.CreatingLabManagementSwitchMessage `
+            WriteMessage -Message $($LocalizedData.CreatingLabManagementSwitchMessage `
                 -f $ManagementSwitchName,$ManagementVlan)
         }
         # Check the Vlan ID of the adapter on the switch
@@ -526,7 +572,7 @@ Function Install-Lab {
 
         if ($ExistingVlan -ne $ManagementVlan)
         {
-            Write-Verbose -Message $($LocalizedData.UpdatingLabManagementSwitchMessage `
+            WriteMessage -Message $($LocalizedData.UpdatingLabManagementSwitchMessage `
                 -f $ManagementSwitchName,$ManagementVlan)
 
             Set-VMNetworkAdapterVlan `
@@ -587,7 +633,7 @@ Function Install-Lab {
             -VMs $VMs `
             -ErrorAction Stop
 
-        Write-Verbose -Message $($LocalizedData.LabInstallCompleteMessage `
+        WriteMessage -Message $($LocalizedData.LabInstallCompleteMessage `
             -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath)
     } # process
     end 
@@ -664,7 +710,7 @@ Function Update-Lab {
         Install-Lab `
             @PSBoundParameters
 
-        Write-Verbose -Message $($LocalizedData.LabUpdateCompleteMessage `
+        WriteMessage -Message $($LocalizedData.LabUpdateCompleteMessage `
             -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.fullconfigpath)
     } # process
 
@@ -794,7 +840,8 @@ Function Uninstall-Lab {
     
     process
     {
-        if ($PSCmdlet.ShouldProcess( ( $LocalizedData.ShouldUninstallLab `
+        if ($PSCmdlet.ShouldProcess( 'LocalHost', `
+            ($LocalizedData.ShouldUninstallLab `
             -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )))
         {
             # Remove the VMs
@@ -810,7 +857,8 @@ Function Uninstall-Lab {
             # Remove the VM Templates
             if ($RemoveVMTemplate)
             {
-                if ($PSCmdlet.ShouldProcess( $($LocalizedData.ShouldRemoveVMTemplate `
+                if ($PSCmdlet.ShouldProcess( 'LocalHost', `
+                    ($LocalizedData.ShouldRemoveVMTemplate `
                     -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )))
                 {
                     $null = Remove-LabVMTemplate `
@@ -821,7 +869,8 @@ Function Uninstall-Lab {
             # Remove the VM Switches
             if ($RemoveSwitch)
             {
-                if ($PSCmdlet.ShouldProcess( $($LocalizedData.ShouldRemoveSwitch `
+                if ($PSCmdlet.ShouldProcess( 'LocalHost', `
+                    ($LocalizedData.ShouldRemoveSwitch `
                     -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )))
                 {
                     $null = Remove-LabSwitch `
@@ -832,7 +881,8 @@ Function Uninstall-Lab {
             # Remove the VM Template VHDs
             if ($RemoveVMTemplateVHD)
             {
-                if ($PSCmdlet.ShouldProcess( $($LocalizedData.ShouldRemoveVMTemplateVHD `
+                if ($PSCmdlet.ShouldProcess( 'LocalHost', `
+                    ($LocalizedData.ShouldRemoveVMTemplateVHD `
                     -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )))
                 {
                     $null = Remove-LabVMTemplateVHD `
@@ -845,7 +895,8 @@ Function Uninstall-Lab {
             {
                 if (Test-Path -Path $Lab.labbuilderconfig.settings.labpath)
                 {
-                    if ($PSCmdlet.ShouldProcess( $($LocalizedData.ShouldRemoveLabFolder `
+                    if ($PSCmdlet.ShouldProcess( 'LocalHost', `
+                        ($LocalizedData.ShouldRemoveLabFolder `
                         -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )))
                     {
                         Remove-Item `
@@ -864,11 +915,11 @@ Function Uninstall-Lab {
                 $null = Remove-VMSwitch `
                     -Name $ManagementSwitchName
 
-                Write-Verbose -Message $($LocalizedData.RemovingLabManagementSwitchMessage `
+                WriteMessage -Message $($LocalizedData.RemovingLabManagementSwitchMessage `
                     -f $ManagementSwitchName)
             }
 
-            Write-Verbose -Message $($LocalizedData.LabUninstallCompleteMessage `
+            WriteMessage -Message $($LocalizedData.LabUninstallCompleteMessage `
                 -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.labpath )
         } # if   
     } # process
@@ -990,7 +1041,7 @@ Function Start-Lab {
         foreach ($BootPhase in $BootPhases)
         {
             # Process this "Bootphase"
-            Write-Verbose -Message $($LocalizedData.StartingBootPhaseVMsMessage `
+            WriteMessage -Message $($LocalizedData.StartingBootPhaseVMsMessage `
                 -f $BootPhase)
 
             # Get all VMs in this "Bootphase"
@@ -1032,7 +1083,7 @@ Function Start-Lab {
                 # Start the VM if it is off
                 if ($VMObject.State -eq 'Off')
                 {
-                    Write-Verbose -Message $($LocalizedData.StartingVMMessage `
+                    WriteMessage -Message $($LocalizedData.StartingVMMessage `
                         -f $VMName)
                     Start-VM `
                         -VM $VMObject
@@ -1059,7 +1110,7 @@ Function Start-Lab {
                         # if we have gone through all VMs in this "Bootphase"
                         # and they're all marked as booted then we can mark
                         # this phase as complete and allow moving on to the next one
-                        Write-Verbose -Message $($LocalizedData.AllBootPhaseVMsStartedMessage `
+                        WriteMessage -Message $($LocalizedData.AllBootPhaseVMsStartedMessage `
                             -f $BootPhase)
                         $PhaseComplete = $True
                     }
@@ -1087,7 +1138,7 @@ Function Start-Lab {
             } # if
         } # foreach
 
-        Write-Verbose -Message $($LocalizedData.LabStartCompleteMessage `
+        WriteMessage -Message $($LocalizedData.LabStartCompleteMessage `
             -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.fullconfigpath)
     } # process
     
@@ -1200,7 +1251,7 @@ Function Stop-Lab {
         foreach ($BootPhase in $BootPhases)
         {
             # Process this "Bootphase"
-            Write-Verbose -Message $($LocalizedData.StoppingBootPhaseVMsMessage `
+            WriteMessage -Message $($LocalizedData.StoppingBootPhaseVMsMessage `
                 -f $BootPhase)
 
             # Get all VMs in this "Bootphase"
@@ -1240,7 +1291,7 @@ Function Stop-Lab {
                 # Shutodwn the VM if it is off
                 if ($VMObject.State -eq 'Running')
                 {
-                    Write-Verbose -Message $($LocalizedData.StoppingVMMessage `
+                    WriteMessage -Message $($LocalizedData.StoppingVMMessage `
                         -f $VMName)
                     $null = Stop-VM `
                         -VM $VMObject `
@@ -1264,7 +1315,7 @@ Function Stop-Lab {
                         # if we have gone through all VMs in this "Bootphase"
                         # and they're all marked as stopped then we can mark
                         # this phase as complete and allow moving on to the next one
-                        Write-Verbose -Message $($LocalizedData.AllBootPhaseVMsStoppedMessage `
+                        WriteMessage -Message $($LocalizedData.AllBootPhaseVMsStoppedMessage `
                             -f $BootPhase)
                         $PhaseComplete = $True
                     }
@@ -1278,7 +1329,7 @@ Function Stop-Lab {
             } # while
         } # foreach
 
-        Write-Verbose -Message $($LocalizedData.LabStopCompleteMessage `
+        WriteMessage -Message $($LocalizedData.LabStopCompleteMessage `
             -f $Lab.labbuilderconfig.name,$Lab.labbuilderconfig.settings.fullconfigpath)
     } # process
 
