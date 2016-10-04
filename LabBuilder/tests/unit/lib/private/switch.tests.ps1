@@ -1,5 +1,5 @@
 $Global:ModuleRoot = Resolve-Path -Path "$($Script:MyInvocation.MyCommand.Path)\..\..\..\..\..\"
-
+$OldPSModulePath = $env:PSModulePath
 Push-Location
 try
 {
@@ -48,7 +48,7 @@ try
 
                 [Parameter(Mandatory)]
                 [String] $errorMessage,
-                
+
                 [Switch]
                 $terminate
             )
@@ -63,7 +63,7 @@ try
         $Script:CurrentBuild = 10586
 
 
-        Describe 'GetManagementSwitchName' {
+        Describe '\Lib\Private\Switch.ps1\GetManagementSwitchName' {
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
 
             Context 'Valid Configuration Passed' {
@@ -74,8 +74,8 @@ try
         }
 
 
-        Describe 'UpdateSwitchManagementAdapter' {
-
+        Describe '\Lib\Private\Switch.ps1\UpdateSwitchManagementAdapter' {
+            # Mock functions
             function Set-VMNetworkAdapter {
                 param (
                     [Parameter(ValueFromPipeline=$True)]
@@ -93,6 +93,8 @@ try
                     [Switch] $Access
                 )
             }
+            function Get-VMNetworkAdapter {}
+            function Add-VMNetworkAdapter {}
 
             $TestAdapter = @{
                 Name = 'Adapter Name'
@@ -100,6 +102,7 @@ try
                 VlanId = 10
                 StaticMacAddress = '1234567890AB'
             }
+
 
             Mock Get-VMNetworkAdapter
             Mock Add-VMNetworkAdapter -MockWith { @{ Name = 'Adapter Name'; SwitchName = 'Switch Name' } }
@@ -219,4 +222,5 @@ catch
 finally
 {
     Pop-Location
+    $env:PSModulePath = $OldPSModulePath
 }
