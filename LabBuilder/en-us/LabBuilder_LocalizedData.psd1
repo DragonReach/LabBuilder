@@ -107,6 +107,7 @@ ConvertFrom-StringData -StringData @'
     PackageProviderNotInstalledError=The required package provider '{0}' is not installed.
     PackageSourceNotTrustedError=The required package source '{0}' is not trusted.
     PackageSourceNotRegisteredError=The required package source '{0}' is not registered.
+    ODJCopyError=Error copying Offline Domain Join file '{1}' to VM '{0}'.
 
     ImportingLibFileMessage=Importing function library '{0}'.
     EnablingWSManMessage=Enabling WS-Man for communication with Lab Guests.

@@ -159,6 +159,13 @@ function Get-LabVM {
                 ThrowException @ExceptionParameters
             } # if
 
+            # Get path to Offline Domain Join file if it exists
+            [String]$NanoODJPath = $null
+            if ($VM.NanoODJPath)
+            {
+                $NanoODJPath = $VM.NanoODJPath
+            } # if
+
             # Assemble the Network adapters that this VM will use
             [LabVMAdapter[]] $VMAdapters = @()
             [Int] $AdapterCount = 0
@@ -176,7 +183,7 @@ function Get-LabVM {
                             -f $VMName)
                     }
                     ThrowException @ExceptionParameters
-                }
+                } # if
 
                 if (-not $AdapterSwitchName)
                 {
@@ -187,7 +194,7 @@ function Get-LabVM {
                             -f $VMName,$AdapterName)
                     }
                     ThrowException @ExceptionParameters
-                }
+                } # if
 
                 # if a LabId is set for the lab, prepend it to the adapter name
                 # name and switch name.
@@ -195,7 +202,7 @@ function Get-LabVM {
                 {
                     $AdapterName = "$LabId$AdapterName"
                     $AdapterSwitchName = "$LabId$AdapterSwitchName"
-                }
+                } # if
 
                 # Check the switch is in the switch list
                 [Boolean] $Found = $False
@@ -886,7 +893,6 @@ function Get-LabVM {
                 $Generation = $VMTemplate.generation
             } # if
 
-
             # Get the Certificate Source
             $CertificateSource = [LabCertificateSource]::Guest
             if ($OSType -eq [LabOSType]::Nano)
@@ -924,6 +930,7 @@ function Get-LabVM {
             $LabVM.DataVHDs = $DataVHDs
             $LabVM.DVDDrives = $DVDDrives
             $LabVM.DSC = $LabDSC
+            $LabVM.NanoODJPath = $NanoODJPath
             $LabVM.VMRootPath = Join-Path `
                 -Path $LabPath `
                 -ChildPath $VMName
@@ -1503,6 +1510,14 @@ function Install-LabVM {
                 }
                 ThrowException @ExceptionParameters
             } # if
+        } # if
+
+        if ($VM.OSType -in ([LabOStype]::Nano))
+        {
+        # Copy ODJ Files if it Exists
+            CopyODJ `
+                -Lab $Lab `
+                -VM $VM
         } # if
 
         # Create any DSC Files for the VM
