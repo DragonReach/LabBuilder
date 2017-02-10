@@ -1,5 +1,5 @@
 $Global:ModuleRoot = Resolve-Path -Path "$($Script:MyInvocation.MyCommand.Path)\..\..\..\..\..\"
-$OldPSModulePath = $env:PSModulePath
+
 Push-Location
 try
 {
@@ -64,7 +64,7 @@ try
         $Script:CurrentBuild = 10586
 
 
-        Describe '\Lib\Public\Lab.ps1\Get-Lab' {
+        Describe 'Get-Lab' {
             Context 'Relative Path is provided and valid XML file exists' {
                 Mock Get-Location -MockWith { @{ Path = $Global:TestConfigPath} }
                 It 'Returns XmlDocument object with valid content' {
@@ -141,12 +141,12 @@ try
 
 
 
-        Describe '\Lib\Public\Lab.ps1\New-Lab' -Tags 'Incomplete'  {
+        Describe 'New-Lab' -Tags 'Incomplete'  {
         }
 
 
 
-        Describe '\Lib\Public\Lab.ps1\Install-Lab' -Tags 'Incomplete'  {
+        Describe 'Install-Lab' -Tags 'Incomplete'  {
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
 
             Mock Get-VMSwitch
@@ -171,22 +171,22 @@ try
 
 
 
-        Describe '\Lib\Public\Lab.ps1\Update-Lab' -Tags 'Incomplete'  {
+        Describe 'Update-Lab' -Tags 'Incomplete'  {
         }
 
 
 
-        Describe '\Lib\Public\Lab.ps1\Uninstall-Lab' -Tags 'Incomplete'  {
+        Describe 'Uninstall-Lab' -Tags 'Incomplete'  {
         }
 
 
 
-        Describe '\Lib\Public\Lab.ps1\Start-Lab' -Tags 'Incomplete'  {
+        Describe 'Start-Lab' -Tags 'Incomplete'  {
         }
 
 
 
-        Describe '\Lib\Public\Lab.ps1\Stop-Lab' -Tags 'Incomplete'  {
+        Describe 'Stop-Lab' -Tags 'Incomplete'  {
         }
     }
 }
@@ -197,5 +197,4 @@ catch
 finally
 {
     Pop-Location
-    $env:PSModulePath = $OldPSModulePath
 }

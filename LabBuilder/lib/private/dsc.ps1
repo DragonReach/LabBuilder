@@ -1154,7 +1154,7 @@ Configuration ConfigLCM {
     Node $ComputerName {
         Settings {
             RefreshMode = 'Push'
-            ConfigurationMode = 'ApplyAndAutoCorrect'
+            ConfigurationMode = 'ApplyAndMonitor'
             CertificateId = $Thumbprint
             ConfigurationModeFrequencyMins = 15
             RefreshFrequencyMins = 30

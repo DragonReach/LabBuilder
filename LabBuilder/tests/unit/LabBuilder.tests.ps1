@@ -1,5 +1,5 @@
 $Global:ModuleRoot = Resolve-Path -Path "$($Script:MyInvocation.MyCommand.Path)..\..\..\..\"
-$OldPSModulePath = $env:PSModulePath
+
 Push-Location
 try
 {
@@ -89,7 +89,7 @@ try
 
                 [Parameter(Mandatory)]
                 [String] $errorMessage,
-
+                
                 [Switch]
                 $terminate
             )
@@ -131,5 +131,4 @@ catch
 finally
 {
     Pop-Location
-    $env:PSModulePath = $OldPSModulePath
 }

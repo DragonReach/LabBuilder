@@ -1,5 +1,5 @@
 $Global:ModuleRoot = Resolve-Path -Path "$($Script:MyInvocation.MyCommand.Path)\..\..\..\..\..\"
-$OldPSModulePath = $env:PSModulePath
+
 Push-Location
 try
 {
@@ -48,7 +48,7 @@ try
 
                 [Parameter(Mandatory)]
                 [String] $errorMessage,
-
+                
                 [Switch]
                 $terminate
             )
@@ -64,7 +64,7 @@ try
         $Script:CurrentBuild = 14295
 
 
-        Describe '\Lib\Public\Switch.ps1\Get-LabSwitch' {
+        Describe 'Get-LabSwitch' {
 
             Context 'Configuration passed with switch missing Switch Name.' {
                 It 'Throws a SwitchNameIsEmptyError Exception' {
@@ -118,7 +118,7 @@ try
                         errorId = 'AdapterSpecifiedError'
                         errorCategory = 'InvalidArgument'
                         errorMessage = $($LocalizedData.AdapterSpecifiedError `
-                            -f 'Private',"$($Lab.labbuilderconfig.settings.labid)External")
+                            -f 'Private',"$($Lab.labbuilderconfig.settings.labid) External")
                     }
                     $Exception = GetException @ExceptionParameters
 
@@ -152,22 +152,11 @@ try
 
 
 
-        Describe '\Lib\Public\Switch.ps1\Initialize-LabSwitch' {
+        Describe 'Initialize-LabSwitch' {
 
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
             [LabSwitch[]] $Switches = Get-LabSwitch -Lab $Lab
 
-            # Mock functions
-            function Get-VMSwitch {}
-            function New-VMSwitch {}
-            function Get-VMNetworkAdapter {
-                [cmdletbinding()]
-                param (
-                    [String] $Name,
-                    [String] $SwitchName,
-                    [Switch] $ManagementOS
-                )
-            }
             function Get-NetAdapter {
                 [cmdletbinding()]
                 param (
@@ -527,12 +516,7 @@ try
 
 
 
-        Describe '\Lib\Public\Switch.ps1\Remove-LabSwitch' {
-            # Mock functions
-            function Get-VMSwitch {}
-            function Remove-VMSwitch {}
-            function Remove-VMNetworkAdapter {}
-            function Remove-NetNat {}
+        Describe 'Remove-LabSwitch' {
 
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
             [LabSwitch[]] $Switches = Get-LabSwitch -Lab $Lab
@@ -595,5 +579,4 @@ catch
 finally
 {
     Pop-Location
-    $env:PSModulePath = $OldPSModulePath
 }

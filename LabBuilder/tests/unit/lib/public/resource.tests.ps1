@@ -1,5 +1,5 @@
 $Global:ModuleRoot = Resolve-Path -Path "$($Script:MyInvocation.MyCommand.Path)\..\..\..\..\..\"
-$OldPSModulePath = $env:PSModulePath
+
 Push-Location
 try
 {
@@ -64,7 +64,7 @@ try
         $Script:CurrentBuild = 10586
 
 
-        Describe '\Lib\Public\Resource.ps1\Get-LabResourceModule' {
+        Describe 'Get-LabResourceModule' {
 
             Context 'Configuration passed with resource module missing Name.' {
                 It 'Throws a ResourceModuleNameIsEmptyError Exception' {
@@ -93,7 +93,7 @@ try
 
 
 
-        Describe '\Lib\Public\Resource.ps1\Initialize-LabResourceModule' {
+        Describe 'Initialize-LabResourceModule' {
 
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
             [LabResourceModule[]]$ResourceModules = Get-LabResourceModule -Lab $Lab
@@ -112,7 +112,7 @@ try
 
 
 
-        Describe '\Lib\Public\Resource.ps1\Get-LabResourceMSU' {
+        Describe 'Get-LabResourceMSU' {
 
             Context 'Configuration passed with resource MSU missing Name.' {
                 It 'Throws a ResourceMSUNameIsEmptyError Exception' {
@@ -141,7 +141,7 @@ try
 
 
 
-        Describe '\Lib\Public\Resource.ps1\Initialize-LabResourceMSU' {
+        Describe 'Initialize-LabResourceMSU' {
 
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
             [LabResourceMSU[]]$ResourceMSUs = Get-LabResourceMSU -Lab $Lab
@@ -161,7 +161,7 @@ try
 
 
 
-        Describe '\Lib\Public\Resource.ps1\Get-LabResourceISO' {
+        Describe 'Get-LabResourceISO' {
 
             Context 'Configuration passed with resource ISO missing Name.' {
                 It 'Throws a ResourceISONameIsEmptyError Exception' {
@@ -238,7 +238,7 @@ try
 
 
 
-        Describe '\Lib\Public\Resource.ps1\Initialize-LabResourceISO' {
+        Describe 'Initialize-LabResourceISO' {
             $Path = "$Global:TestConfigPath\ISOFiles"
             $Lab = Get-Lab -ConfigPath $Global:TestConfigOKPath
             $Lab.labbuilderconfig.resources.SetAttribute('isopath',$Path)
@@ -264,5 +264,4 @@ catch
 finally
 {
     Pop-Location
-    $env:PSModulePath = $OldPSModulePath
 }
