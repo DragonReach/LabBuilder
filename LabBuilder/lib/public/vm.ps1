@@ -779,6 +779,8 @@ function Get-LabVM {
             {
                 $ExposeVirtualizationExtensions = $VMTemplate.ExposeVirtualizationExtensions
             } # if
+
+            # Get the Enable TPM flag
             if ($VM.EnableTPM)
             {
                 $EnableTPM = ($Template.EnableTPM -eq 'Y')
@@ -787,6 +789,12 @@ function Get-LabVM {
             {
                 $EnableTPM = $VMTemplate.EnableTPM
             } # if
+
+            if ($VM.LCMSetting)
+            {
+                $LCMSetting = $VM.LCMSetting
+            } # if
+
 
             # If VM requires ExposeVirtualizationExtensions but
             # it is not supported on Host then throw an exception.
@@ -940,6 +948,7 @@ function Get-LabVM {
             $LabVM.DSC = $LabDSC
             $LabVM.EnableTPM = $EnableTPM
             $LabVM.NanoODJPath = $NanoODJPath
+            $LabVM.LCMSetting = $LCMSetting
             $LabVM.VMRootPath = Join-Path `
                 -Path $LabPath `
                 -ChildPath $VMName
@@ -1210,14 +1219,14 @@ function Initialize-LabVM {
         else
         { # Yes, it is - is the setting different?
             if ($VM.EnableTPM -ne (Get-VMSecurity -VMName $VM.Name).TPMEnabled)
-            { if(($VM.EnableTPM -eq 'y') -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $False))
+            { if(($VM.EnableTPM -eq $True) -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $False))
                 { 
                     # Try and update it
                     Enable-VMTpm `
                     -VMName $VM.Name `
                     -ErrorAction Stop
                 }
-                ElseIf (($VM.EnableTPM -eq 'n') -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $True))
+                ElseIf (($VM.EnableTPM -eq $False) -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $True))
                     {
                     # Try and update it
                         Disable-VMTpm `

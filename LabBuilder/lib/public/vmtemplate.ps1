@@ -270,6 +270,11 @@ function Get-LabVMTemplate {
             $VMTemplate.generation = 2
         } # if
 
+        if ($Template.LCMSetting)
+        {
+            $VMTemplate.LCMSetting = $Template.LCMSetting
+        } # if
+
         if ($Template.ProcessorCount)
         {
             $VMTemplate.ProcessorCount = $Template.ProcessorCount
