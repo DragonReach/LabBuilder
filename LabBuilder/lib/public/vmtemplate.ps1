@@ -307,6 +307,10 @@ function Get-LabVMTemplate {
         {
             $VMTemplate.IntegrationServices = $null
         } # if
+        if ($Template.EnableTPM)
+        {
+            $VMTemplate.EnableTPM = ($Template.EnableTPM -eq 'Y')
+        } # if
         if ($Template.Packages)
         {
             $VMTemplate.Packages = $Template.Packages

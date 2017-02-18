@@ -108,7 +108,7 @@ ConvertFrom-StringData -StringData @'
     PackageSourceNotTrustedError=The required package source '{0}' is not trusted.
     PackageSourceNotRegisteredError=The required package source '{0}' is not registered.
     ODJCopyError=Error copying Offline Domain Join file '{1}' to VM '{0}'.
-
+    EnableTPM=The VM '{0}' requires a Virtual TPM, but this is not supported by your version of Windows. Either set the EnableTPM attribute to 'N' for the VM or update to a Windows Build 10565 or above.
     ImportingLibFileMessage=Importing function library '{0}'.
     EnablingWSManMessage=Enabling WS-Man for communication with Lab Guests.
     InstallingHyperVComponentsMesage=Installing {0} Hyper-V Components.
