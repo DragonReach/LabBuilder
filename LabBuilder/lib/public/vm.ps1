@@ -780,6 +780,23 @@ function Get-LabVM {
                 $ExposeVirtualizationExtensions = $VMTemplate.ExposeVirtualizationExtensions
             } # if
 
+            # Get the Enable TPM flag
+            $EnableTPM=$False
+            if ($VM.EnableTPM)
+            {
+                $EnableTPM = ($VM.EnableTPM -eq 'Y')
+            }
+            elseif ($VMTemplate.EnableTPM)
+            {
+                $EnableTPM = $VMTemplate.EnableTPM
+            } # if
+
+            if ($VM.LCMSetting)
+            {
+                $LCMSetting = $VM.LCMSetting
+            } # if
+
+
             # If VM requires ExposeVirtualizationExtensions but
             # it is not supported on Host then throw an exception.
             if ($ExposeVirtualizationExtensions -and ($Script:CurrentBuild -lt 10565))
@@ -930,7 +947,9 @@ function Get-LabVM {
             $LabVM.DataVHDs = $DataVHDs
             $LabVM.DVDDrives = $DVDDrives
             $LabVM.DSC = $LabDSC
+            $LabVM.EnableTPM = $EnableTPM
             $LabVM.NanoODJPath = $NanoODJPath
+            $LabVM.LCMSetting = $LCMSetting
             $LabVM.VMRootPath = Join-Path `
                 -Path $LabPath `
                 -ChildPath $VMName
@@ -1181,6 +1200,38 @@ function Initialize-LabVM {
                     -ErrorAction Stop
             } # if
         } # if
+
+        # Is EnableTPM supported?
+        if ($Script:CurrentBuild -lt 14393)
+        {
+            # No, it is not supported - is it required by VM?
+            if ($VM.EnableTPM)
+            {
+                # EnableTPM is required for this VM
+                $ExceptionParameters = @{
+                    errorId = 'EnableTPM'
+                    errorCategory = 'InvalidArgument'
+                    errorMessage = $($LocalizedData.EnableTPM `
+                        -f $VM.Name)
+                }
+                ThrowException @ExceptionParameters
+            } # if
+        }
+        else  # Yes, Enable TPM is supported - is the setting different?
+        { 
+            if ($VM.EnableTPM -ne (Get-VMSecurity -VMName $VM.Name).TpmEnabled)
+            { 
+                if ($VM.EnableTPM)
+                {
+                    Set-VMKeyProtector -VMName $VM.Name -NewLocalKeyProtector
+                    Enable-VMTpm -VMName $VM.Name -ErrorAction Stop 
+                }            
+                ElseIf (-not($VM.EnableTPM))
+                {
+                    Disable-VMTpm -VMName $VM.Name -ErrorAction Stop 
+                }
+            } #If
+        } #Else
 
         # Enable/Disable the Integration Services
         UpdateVMIntegrationServices `

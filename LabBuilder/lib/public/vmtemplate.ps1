@@ -269,6 +269,10 @@ function Get-LabVMTemplate {
         {
             $VMTemplate.generation = 2
         } # if
+        if ($Template.LCMSetting)
+        {
+            $VMTemplate.LCMSetting = $Template.LCMSetting
+        } # if
 
         if ($Template.ProcessorCount)
         {
@@ -306,6 +310,11 @@ function Get-LabVMTemplate {
         else
         {
             $VMTemplate.IntegrationServices = $null
+        } # if
+        $VMTemplate.EnableTPM=$False
+        if ($Template.EnableTPM)
+        {
+            $VMTemplate.EnableTPM = ($Template.EnableTPM -eq 'Y')
         } # if
         if ($Template.Packages)
         {

@@ -401,7 +401,8 @@ function CreateDSCMOFFiles {
     $null = ConfigLCM `
         -OutputPath $($ENV:Temp) `
         -ComputerName $($VM.ComputerName) `
-        -Thumbprint $CertificateThumbprint
+        -Thumbprint $CertificateThumbprint `
+        -LCMSetting $VM.LCMSetting
     if (-not (Test-Path -Path $DSCMOFMetaFile))
     {
         $ExceptionParameters = @{
@@ -1149,12 +1150,13 @@ $DSCNetworkingConfig += @"
 Configuration ConfigLCM {
     Param (
         [String] $ComputerName,
-        [String] $Thumbprint
+        [String] $Thumbprint,
+        [String] $LCMSetting
     )
     Node $ComputerName {
         Settings {
             RefreshMode = 'Push'
-            ConfigurationMode = 'ApplyAndMonitor'
+            ConfigurationMode = $LCMSetting
             CertificateId = $Thumbprint
             ConfigurationModeFrequencyMins = 15
             RefreshFrequencyMins = 30
