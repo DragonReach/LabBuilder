@@ -781,9 +781,10 @@ function Get-LabVM {
             } # if
 
             # Get the Enable TPM flag
+            $EnableTPM=$False
             if ($VM.EnableTPM)
             {
-                $EnableTPM = ($Template.EnableTPM -eq 'Y')
+                $EnableTPM = ($VM.EnableTPM -eq 'Y')
             }
             elseif ($VMTemplate.EnableTPM)
             {
@@ -1201,7 +1202,7 @@ function Initialize-LabVM {
         } # if
 
         # Is EnableTPM supported?
-        if ($Script:CurrentBuild -lt 10565)
+        if ($Script:CurrentBuild -lt 14393)
         {
             # No, it is not supported - is it required by VM?
             if ($VM.EnableTPM)
@@ -1216,25 +1217,21 @@ function Initialize-LabVM {
                 ThrowException @ExceptionParameters
             } # if
         }
-        else
-        { # Yes, it is - is the setting different?
-            if ($VM.EnableTPM -ne (Get-VMSecurity -VMName $VM.Name).TPMEnabled)
-            { if(($VM.EnableTPM -eq $True) -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $False))
-                { 
-                    # Try and update it
-                    Enable-VMTpm `
-                    -VMName $VM.Name `
-                    -ErrorAction Stop
+        else  # Yes, Enable TPM is supported - is the setting different?
+        { 
+            if ($VM.EnableTPM -ne (Get-VMSecurity -VMName $VM.Name).TpmEnabled)
+            { 
+                if ($VM.EnableTPM)
+                {
+                    Set-VMKeyProtector -VMName $VM.Name -NewLocalKeyProtector
+                    Enable-VMTpm -VMName $VM.Name -ErrorAction Stop 
+                }            
+                ElseIf (-not($VM.EnableTPM))
+                {
+                    Disable-VMTpm -VMName $VM.Name -ErrorAction Stop 
                 }
-                ElseIf (($VM.EnableTPM -eq $False) -and ((Get-VMSecurity -VMName $VM.Name).TPMEnabled -eq $True))
-                    {
-                    # Try and update it
-                        Disable-VMTpm `
-                        -VMName $VM.Name `
-                        -ErrorAction Stop
-                    } # Elseif
-             } # if
-         } #Else 
+            } #If
+        } #Else
 
         # Enable/Disable the Integration Services
         UpdateVMIntegrationServices `
