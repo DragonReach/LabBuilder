@@ -272,6 +272,10 @@ function Get-LabVMTemplate {
         if ($Template.LCMSetting)
         {
             $VMTemplate.LCMSetting = $Template.LCMSetting
+        } 
+        elseif (-not $Template.LCMSetting)
+        {
+            $VMTemplate.LCMSetting='ApplyAndMonitor'
         } # if
 
         if ($Template.ProcessorCount)

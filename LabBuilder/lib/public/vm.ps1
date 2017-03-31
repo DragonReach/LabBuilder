@@ -791,6 +791,7 @@ function Get-LabVM {
                 $EnableTPM = $VMTemplate.EnableTPM
             } # if
 
+            $LCMSetting='ApplyAndMonitor'
             if ($VM.LCMSetting)
             {
                 $LCMSetting = $VM.LCMSetting
