@@ -108,6 +108,7 @@ ConvertFrom-StringData -StringData @'
     PackageSourceNotTrustedError=The required package source '{0}' is not trusted.
     PackageSourceNotRegisteredError=The required package source '{0}' is not registered.
     ODJCopyError=Error copying Offline Domain Join file '{1}' to VM '{0}'.
+    VMNotRunningHeartbeatError=Virtual Machine '{0}' is not running, so waiting for heartbeat failed.
 
     ImportingLibFileMessage=Importing function library '{0}'.
     EnablingWSManMessage=Enabling WS-Man for communication with Lab Guests.
@@ -222,6 +223,7 @@ ConvertFrom-StringData -StringData @'
     ConfigurationXMLValidationMessage=Lab Configuration XML '{0}'- {1}
     InstallPackageProviderMessage=Installing Package Provider '{0}'.
     RegisterPackageSourceMessage=Registering Package Source '{0}' with '{1}'.
+    WaitingForVMHeartbeatMessage=Waiting for Virtual Machine '{0}' heartbeat, retrying in {1} seconds.
 
     ShouldUninstallLab=Uninstall the Lab '{0}' in folder '{1}'
     ShouldRemoveVMTemplate=Delete the Parent VM Template VHDs used by Lab '{0}' in folder '{1}'

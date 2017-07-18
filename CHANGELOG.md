@@ -1,4 +1,31 @@
-# Changelist
+# Change Log
+
+## 0.8.3.1140
+
+- Enforce xNetworking v5.0.0.0 is installed and used - fixes [Issue #289](https://github.com/PlagueHO/LabBuilder/issues/289).
+- DSCLibrary\MEMBER_SQLSERVER2014.DSC.ps1: Updated to support v8.0.0.0 of xSQLServer
+- DSCLibrary\MEMBER_SQLSERVER2016.DSC.ps1: Updated to support v8.0.0.0 of xSQLServer
+
+## 0.8.3.1132
+
+- Added .vscode\settings.json to force code styles and enable auto formatting in VS Code.
+- Changed WaitVMStarted to check VM is running and also handle blank heartbeat being returned
+  in Windows 10 15063 (Creators Update) and above.
+- Updated LabBuilder to support changes in xNetworking DSC Resource v5.0.0.0
+- Updated DSC sample configurations to support xStorage DSC Resource v3.2.0.0
+
+## 0.8.3.1124
+
+- DSCLibrary\MEMBER_DHCPNPAS2016.DSC.ps1:Added DSC Library Configuration for DHCP with NPAS on
+  Windows Server 2016 - see [Issue 283](https://github.com/PlagueHO/LabBuilder/issues/283).
+
+## 0.8.3.1116
+
+- Moved Changelist.md file to root and renamed to CHANGELOG.MD.
+- Cleaned up markdown errors in README.MD.
+- Updated samples to use latest version of Windows Server 2016 Evaulation ISO.
+- Added sample Sample_WS2016_DomainFunctions.xml for creating an Azure Functions lab.
+- Added support for codecoverage analysis using CodeCov.io.
 
 ## 0.8.3.1107
 
@@ -226,7 +253,7 @@
 - VM\SetupComplete attribute supports rooted paths.
 - DSC\ConfigFile Lab setting supports rooted paths.
 - VM\UseDifferencingBootDisk default changed to 'Y'.
-- GetModulesInDSCConfig: Returns Array of objects containing ModuleName and ModuleVersion.
+- Get-ModulesInDSCConfig: Returns Array of objects containing ModuleName and ModuleVersion.
                          Now returns PSDesiredStateConfiguration module if listed -expected that calling function will ignore if required.
                          Added function to set the Module versions in a DSC Config.
 - CreateDSCMOFFiles: Updated to set Module versions in DSC Config files.
@@ -351,8 +378,6 @@
 ## 0.1.0.0
 
 - Initial Release.
-
-
 
 
 

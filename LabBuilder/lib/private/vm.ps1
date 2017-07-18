@@ -497,13 +497,13 @@ if (Test-Path -Path `"`$(`$ENV:SystemRoot)\$Script:DSCEncryptionPfxCert`")
 .EXAMPLE
     $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
     $VMs = Get-LabVM -Lab $Lab
-    GetSelfSignedCertificate -Lab $Lab -VM $VMs[0]
+    Recieve-SelfSignedCertificate -Lab $Lab -VM $VMs[0]
     Downloads the existing Self-signed certificate for the VM to the Labbuilder files folder of the
     VM.
 .OUTPUTS
     The path to the certificate file that was downloaded.
 #>
-function GetSelfSignedCertificate
+function Recieve-SelfSignedCertificate
 {
     [CmdLetBinding()]
     [OutputType([Boolean])]
@@ -605,7 +605,7 @@ function GetSelfSignedCertificate
         } # if
     } # while
     return (Get-Item -Path "$VMLabBuilderFiles\$($Script:DSCEncryptionCert)")
-} # GetSelfSignedCertificate
+} # Recieve-SelfSignedCertificate
 
 
 <#
@@ -627,13 +627,13 @@ function GetSelfSignedCertificate
 .EXAMPLE
     $Lab = Get-Lab -ConfigPath c:\mylab\config.xml
     $VMs = Get-LabVM -Lab $Lab
-    RecreateSelfSignedCertificate -Lab $Lab -VM $VMs[0]
+    Request-SelfSignedCertificate -Lab $Lab -VM $VMs[0]
     Causes a new self-signed certificate on the VM and download it to the Labbuilder files folder
     of th VM.
 .OUTPUTS
     The path to the certificate file that was downloaded.
 #>
-function RecreateSelfSignedCertificate
+function Request-SelfSignedCertificate
 {
     [CmdLetBinding()]
     [OutputType([System.IO.FileInfo])]
@@ -801,7 +801,7 @@ function RecreateSelfSignedCertificate
         } # If
     } # While
     return (Get-Item -Path "$VMLabBuilderFiles\$($Script:DSCEncryptionCert)")
-} # RecreateSelfSignedCertificate
+} # Request-SelfSignedCertificate
 
 
 <#
@@ -1111,12 +1111,28 @@ function WaitVMStarted {
         [LabVM] $VM
     )
 
-	#Names of IntegrationServices are not culture neutral, but have an ID
-	$HeartbeatCultureNeutral = ( Get-VMIntegrationService -VMName $VM.Name | Where-Object { $_.ID -match "84EAAE65-2F2E-45F5-9BB5-0E857DC8EB47" } ).Name
-	$Heartbeat = Get-VMIntegrationService -VMName $VM.Name -Name $HeartbeatCultureNeutral
-    while ($Heartbeat.PrimaryStatusDescription -ne 'OK')
+    # If the VM is not running then throw an exception
+    if ((Get-VM -VMName $VM.Name).State -ne 'Running') {
+        $ExceptionParameters = @{
+            errorId = 'VMNotRunningHeartbeatMessage'
+            errorCategory = 'InvalidArgument'
+            errorMessage = $($LocalizedData.VMNotRunningHeartbeatMessage `
+                -f $VM.name)
+        }
+        ThrowException @ExceptionParameters
+    } # if
+
+    # Names of IntegrationServices are not culture neutral, but have an ID
+    $heartbeatCultureNeutral = ( Get-VMIntegrationService -VMName $VM.Name | Where-Object { $_.ID -match "84EAAE65-2F2E-45F5-9BB5-0E857DC8EB47" } ).Name
+    $heartbeat = Get-VMIntegrationService -VMName $VM.Name -Name $heartbeatCultureNeutral
+
+    while (($heartbeat.PrimaryStatusDescription -ne 'OK') -and (-not [String]::IsNullOrEmpty($heartbeat.PrimaryStatusDescription)))
     {
-        $Heartbeat = Get-VMIntegrationService -VMName $VM.Name -Name $HeartbeatCultureNeutral
+        $heartbeat = Get-VMIntegrationService -VMName $VM.Name -Name $heartbeatCultureNeutral
+
+        WriteMessage -Message $($LocalizedData.WaitingForVMHeartbeatMessage `
+            -f $VM.Name,$Script:RetryHeartbeatSeconds)
+
         Start-Sleep -Seconds $Script:RetryHeartbeatSeconds
     } # while
 } # WaitVMStarted
