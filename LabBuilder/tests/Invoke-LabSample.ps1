@@ -1,5 +1,5 @@
 ﻿# Set the name of the sample Lab from the samples folder:
-[String]$Script:ConfigPath = "$PSScriptRoot\..\Samples\Sample_WS2016_DCandDHCPOnly.xml"
+[String]$Script:ConfigPath = "$PSScriptRoot\..\Samples\Sample_WS2016_DomainFunctions.xml"
 [String]$Script:ModulePath = "$PSScriptRoot\..\LabBuilder.psd1"
 
 ####################################################################################################

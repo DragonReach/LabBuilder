@@ -28,9 +28,15 @@ install:
         # update AppVeyor build
         Update-AppveyorBuild -Version $version
 
-        # Set version number
-        $ManifestContent = $ManifestContent -replace '(?<=ModuleVersion\s+=\s+'')(?<ModuleVersion>.*)(?='')', ('${{ModuleVersion}}.{0}' -f $env:APPVEYOR_BUILD_NUMBER)
-        Set-Content -Path $ManifestPath -Value $ManifestContent
+        # Set the new version number in the Module Manifest
+        $manifestContent = $ManifestContent -replace '(?<=ModuleVersion\s+=\s+'')(?<ModuleVersion>.*)(?='')', $newVersion
+        Set-Content -Path $ManifestPath -Value $ManifestContent -NoNewLine
+
+        # Set the new version number in the CHANGELOG.md
+        $changeLogPath = Join-Path -Path $ENV:APPVEYOR_BUILD_FOLDER -ChildPath 'CHANGELOG.md'
+        $changeLogContent = Get-Content -Path $changeLogPath -Raw
+        $changeLogContent = $changeLogContent -replace '# Unreleased', "# $newVersion"
+        Set-Content -Path $changeLogPath -Value $changeLogContent -NoNewLine
 
         Install-WindowsFeature -Name hyper-v-powershell
 
@@ -47,11 +53,29 @@ build: false
 test_script:
     - ps: |
           $testResultsFile = ".\TestsResults.xml"
-          $res = Invoke-Pester -OutputFormat NUnitXml -OutputFile $testResultsFile -PassThru -ExcludeTag Incomplete
+          $results = Invoke-Pester `
+            -OutputFormat NUnitXml `
+            -OutputFile $testResultsFile `
+            -PassThru `
+            -ExcludeTag Incomplete `
+            -CodeCoverage @( Join-Path -Path $env:APPVEYOR_BUILD_FOLDER -ChildPath 'LabBuilder\lib\**\*.ps1' )
+
+          if ($results.CodeCoverage)
+          {
+            Write-Host -Message 'Uploading CodeCoverage to CodeCov.io...'
+            Import-Module -Name (Join-Path -Path $env:APPVEYOR_BUILD_FOLDER -ChildPath '.codecovio\CodeCovio.psm1')
+            $jsonPath = Export-CodeCovIoJson -CodeCoverage $results.CodeCoverage -repoRoot $env:APPVEYOR_BUILD_FOLDER
+            Invoke-UploadCoveCoveIoReport -Path $jsonPath
+          }
+          else
+          {
+            Write-Warning -Message 'Could not create CodeCov.io report because pester results object did not contain a CodeCoverage object'
+          }
+
           (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $testResultsFile))
           Get-ChildItem "$ENV:APPVEYOR_BUILD_FOLDER\LabBuilder\Artifacts\*.*" | Foreach-Object { Push-AppveyorArtifact $_ }
-          if ($res.FailedCount -gt 0) {
-              throw "$($res.FailedCount) tests failed."
+          if ($results.FailedCount -gt 0) {
+              throw "$($results.FailedCount) tests failed."
           }
 
 #---------------------------------#
@@ -105,13 +129,50 @@ deploy_script:
 
         # If this is a build of the Master branch and not a PR push
         # then publish the Module to the PowerShell Gallery.
-        if ((! $ENV:APPVEYOR_PULL_REQUEST_NUMBER) `
-            -and ($ENV:APPVEYOR_REPO_BRANCH -eq 'master'))
-        {
-            Write-Host "Publishing Module to PowerShell Gallery"
-            Copy-Item -Path $ModuleFolder -Destination ($ENV:PSModulePath -split ';')[0] -Recurse
-            Get-PackageProvider -Name NuGet -ForceBootstrap
-            Publish-Module -Name 'LabBuilder' -RequiredVersion ${ENV:APPVEYOR_BUILD_VERSION} -NuGetApiKey $ENV:PowerShellGalleryApiKey -Confirm:$false
+        # Deployment management
+        if ($ENV:APPVEYOR_REPO_BRANCH -eq 'master') {
+            if ($ENV:APPVEYOR_PULL_REQUEST_NUMBER) {
+                # This is a PR so do nothing
+            } elseif ($ENV:APPVEYOR_REPO_COMMIT_MESSAGE -like '* Deploy!') {
+                # This was a deploy commit so no need to do anything
+            } else {
+                # This is not a PR so deploy
+                Write-Host "Beginning deploy process"
+
+                # Pull the master branch, update the readme.md and manifest
+                Set-Location -Path $ENV:APPVEYOR_BUILD_FOLDER
+                & git @('config','--global','credential.helper','store')
+                Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:GitHubPushFromPlagueHO):x-oauth-basic@github.com`n"
+                & git @('config','--global','user.email','plagueho@gmail.com')
+                & git @('config','--global','user.name','Daniel Scott-Raynsford')
+
+                & git @('checkout','-f','master')
+                Set-Content -Path $ManifestPath -Value $ManifestContent
+                Set-Content -Path $changeLogPath -Value $changeLogContent
+
+                # Update the master branch
+                Write-Host "Pushing deployment changes to Master"
+                & git @('add','.')
+                & git @('commit','-m',"$NewVersion Deploy!")
+                & git @('status')
+                & git @('push','origin','master')
+
+                # Create the version tag and push it
+                Write-Host "Pushing $newVersion tag to Master"
+                & git @('tag','-a',$newVersion,'-m',$newVersion)
+                & git @('push','origin',$newVersion)
+
+                # Merge the changes to the Dev branch as well
+                Write-Host "Pushing deployment changes to Dev"
+                & git @('checkout','-f','dev')
+                & git @('merge','master')
+                & git @('push','origin','dev')
+
+                # This is a commit to Master
+                Write-Host "Publishing Module to PowerShell Gallery"
+                Get-PackageProvider -Name NuGet -ForceBootstrap
+                Publish-Module -Name 'LabBuilder' -RequiredVersion $newVersion -NuGetApiKey $ENV:PowerShellGalleryApiKey -Confirm:$false
+            }
         }
 
         # Remove Staging Folder
