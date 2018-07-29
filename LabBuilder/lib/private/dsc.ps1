@@ -264,24 +264,16 @@ function Update-LabDSC
 
     # Make sure all the modules required to create the MOF file are installed
     $installedModules = Get-Module -ListAvailable
-<<<<<<< HEAD
 
     Write-LabMessage -Message $($LocalizedData.DSCConfigIdentifyModulesMessage `
             -f $VM.DSC.ConfigFile, $VM.Name)
 
-=======
-
-    Write-LabMessage -Message $($LocalizedData.DSCConfigIdentifyModulesMessage `
-            -f $VM.DSC.ConfigFile, $VM.Name)
-
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
     $dscConfigContent = Get-Content `
         -Path $($VM.DSC.ConfigFile) `
         -Raw
 
     [LabDSCModule[]] $dscModules = Get-ModulesInDSCConfig `
         -DSCConfigContent $dscConfigContent
-<<<<<<< HEAD
 
     # Add the NetworkingDsc DSC Resource because it is always used
     $module = [LabDSCModule]::New('NetworkingDsc')
@@ -290,16 +282,6 @@ function Update-LabDSC
     $module.MinimumVersion = [Version] '6.0.0.0'
     $dscModules += @( $module )
 
-=======
-
-    # Add the NetworkingDsc DSC Resource because it is always used
-    $module = [LabDSCModule]::New('NetworkingDsc')
-
-    # It must be 6.0.0.0 or greater
-    $module.MinimumVersion = [Version] '6.0.0.0'
-    $dscModules += @( $module )
-
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
     foreach ($dscModule in $dscModules)
     {
         $moduleName = $dscModule.ModuleName
@@ -350,17 +332,10 @@ function Update-LabDSC
             # The Module isn't available on this computer, so try and install it
             Write-LabMessage -Message $($LocalizedData.DSCConfigSearchingForModuleMessage `
                     -f $VM.DSC.ConfigFile, $VM.Name, $ModuleName)
-<<<<<<< HEAD
 
             $newModule = Find-Module `
                 @moduleParameters
 
-=======
-
-            $newModule = Find-Module `
-                @moduleParameters
-
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
             if ($newModule)
             {
                 Write-LabMessage -Message $($LocalizedData.DSCConfigInstallingModuleMessage `
@@ -485,15 +460,9 @@ function Update-LabDSC
     $null = ConfigLCM `
         -OutputPath $($ENV:Temp) `
         -ComputerName $($VM.ComputerName) `
-<<<<<<< HEAD
-        -Thumbprint $CertificateThumbprint `
-        -LCMSetting $VM.LCMSetting
-    if (-not (Test-Path -Path $DSCMOFMetaFile))
-=======
         -Thumbprint $certificateThumbprint
 
     if (-not (Test-Path -Path $dscMOFMetaFile))
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
     {
         $exceptionParameters = @{
             errorId       = 'DSCConfigMetaMOFCreateError'
@@ -1273,7 +1242,6 @@ Configuration Networking {
 
 [DSCLocalConfigurationManager()]
 Configuration ConfigLCM {
-<<<<<<< HEAD
     Param (
         [String] $ComputerName,
         [String] $Thumbprint,
@@ -1284,18 +1252,6 @@ Configuration ConfigLCM {
             RefreshMode = 'Push'
             ConfigurationMode = $LCMSetting
             CertificateId = $Thumbprint
-=======
-    param (
-        [System.String] $ComputerName,
-        [System.String] $Thumbprint
-    )
-    Node $ComputerName {
-        Settings
-        {
-            RefreshMode                    = 'Push'
-            ConfigurationMode              = 'ApplyAndAutoCorrect'
-            CertificateId                  = $Thumbprint
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
             ConfigurationModeFrequencyMins = 15
             RefreshFrequencyMins           = 30
             RebootNodeIfNeeded             = $True

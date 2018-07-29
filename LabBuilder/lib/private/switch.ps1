@@ -28,13 +28,8 @@ function GetManagementSwitchName
     {
         $LabId = $Lab.labbuilderconfig.name
     } # if
-<<<<<<< HEAD
     $ManagementSwitchName = ('{0} Lab Management' `
         -f $LabId)
-=======
-    $ManagementSwitchName = ('{0}Lab Management' `
-            -f $LabId)
->>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
 
     return $ManagementSwitchName
 } # GetManagementSwitchName
