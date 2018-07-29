@@ -346,9 +346,13 @@ class LabVMTemplate:System.ICloneable {
     [String[]] $IntegrationServices = @('Guest Service Interface','Heartbeat','Key-Value Pair Exchange','Shutdown','Time Synchronization','VSS')
     [String[]] $Packages
     [ValidateRange(1,2)][Byte] $Generation = 2
+<<<<<<< HEAD
     [ValidateSet("5.0","6.2","7.0","7.1","8.0","8.1","8.2","8.3","254.0","255.0")][String] $Version = '8.0'
     [ValidateSet("ApplyOnly","ApplyAndMonitor","ApplyAndAutoCorrect")][String] $LCMSetting = 'ApplyAndMonitor'
 
+=======
+    [ValidateSet("5.0","6.2","7.0","7.1","8.0","254.0","255.0")][System.String] $Version = '8.0'
+>>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
 
     LabVMTemplate() {}
 
@@ -432,8 +436,12 @@ class LabVM:System.ICloneable {
     [Uint64] $MemoryStartupBytes = 1GB
     [Boolean] $DynamicMemoryEnabled = $True
     [Boolean] $ExposeVirtualizationExtensions = $False
+<<<<<<< HEAD
     [Boolean] $EnableTPM = $False
     [String] $ParentVHD
+=======
+    [System.String] $ParentVHD
+>>>>>>> c7372ad631785b405e1af240137dc1a08db321ee
     [Boolean] $UseDifferencingDisk = $True
     [System.String] $AdministratorPassword
     [System.String] $ProductKey
