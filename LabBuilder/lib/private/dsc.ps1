@@ -460,9 +460,9 @@ function Update-LabDSC
     $null = ConfigLCM `
         -OutputPath $($ENV:Temp) `
         -ComputerName $($VM.ComputerName) `
-        -Thumbprint $CertificateThumbprint `
-        -LCMSetting $VM.LCMSetting
-    if (-not (Test-Path -Path $DSCMOFMetaFile))
+        -Thumbprint $certificateThumbprint
+
+    if (-not (Test-Path -Path $dscMOFMetaFile))
     {
         $exceptionParameters = @{
             errorId       = 'DSCConfigMetaMOFCreateError'
