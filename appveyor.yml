@@ -8,7 +8,8 @@ environment:
 install:
   - ps: |
         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-        Install-Module -Name Pester -Repository PSGallery -Force
+        Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
+        Install-Module -Name PSScriptAnalyzer -Repository PSGallery -Force -SkipPublisherCheck
 
         # Update AppVeyor Build Version by pulling from Manifest
         $ManifestPath = Join-Path -Path $ENV:APPVEYOR_BUILD_FOLDER -ChildPath 'LabBuilder\LabBuilder.psd1'
@@ -22,8 +23,17 @@ install:
             $version = $Matches[0].Value
         }
 
-        # new version
-        $version = "$version.$env:APPVEYOR_BUILD_NUMBER"
+        # Determine the new version number
+        $versionArray = $version -split '\.'
+        $newVersion = ''
+        Foreach ($ver in (0..2)) {
+            $sem = $versionArray[$ver]
+            if ([System.String]::IsNullOrEmpty($sem)) {
+                $sem = '0'
+            }
+            $newVersion += "$sem."
+        }
+        $newVersion += $env:APPVEYOR_BUILD_NUMBER
 
         # update AppVeyor build
         Update-AppveyorBuild -Version $version
