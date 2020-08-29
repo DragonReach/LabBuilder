@@ -436,17 +436,10 @@ E.g.
                 vhd="Windows Server 2012 R2 Datacenter Full.vhdx" 
                 edition="Windows Server 2012 R2 SERVERDATACENTER" 
                 ostype="Server"
-<<<<<<< HEAD
-                packages="WMF5.0-WS2012R2-W81"
-                vhdformat="vhdx" 
-                vhdtype="dynamic" 
-                generation="2" 
-=======
                 packages="WMF5.1-WS2012R2-W81"
                 vhdformat="vhdx"
                 vhdtype="dynamic"
                 generation="2"
->>>>>>> c22a387fd79c3fde4ea410d92cf1666074537f57
                 vhdsize="40GB" />
 ```
 
