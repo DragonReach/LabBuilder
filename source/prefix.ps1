@@ -326,14 +326,9 @@ class LabVMTemplate:System.ICloneable {
     [System.String] $ParentVHD
     [System.String] $TemplateVHD
     [Uint64] $MemoryStartupBytes = 1GB
-<<<<<<< HEAD:LabBuilder/LabBuilder.psm1
-    [Boolean] $DynamicMemoryEnabled = $True
-    [Boolean] $ExposeVirtualizationExtensions = $False
-    [Boolean] $EnableTPM = $False
-=======
+    [System.Boolean] $EnableTPM = $False
     [System.Boolean] $DynamicMemoryEnabled = $true
     [System.Boolean] $ExposeVirtualizationExtensions = $false
->>>>>>> c22a387fd79c3fde4ea410d92cf1666074537f57:src/LabBuilder.psm1
     [Byte] $ProcessorCount = 1
     [System.String] $AdministratorPassword
     [System.String] $ProductKey
@@ -425,15 +420,9 @@ class LabVM:System.ICloneable {
     [System.String] $ComputerName
     [Byte] $ProcessorCount
     [Uint64] $MemoryStartupBytes = 1GB
-<<<<<<< HEAD:LabBuilder/LabBuilder.psm1
-    [Boolean] $DynamicMemoryEnabled = $True
-    [Boolean] $ExposeVirtualizationExtensions = $False
-    [Boolean] $EnableTPM = $False
-    [String] $ParentVHD
-=======
+    [System.Boolean] $EnableTPM = $False
     [System.Boolean] $DynamicMemoryEnabled = $true
     [System.Boolean] $ExposeVirtualizationExtensions = $false
->>>>>>> c22a387fd79c3fde4ea410d92cf1666074537f57:src/LabBuilder.psm1
     [System.String] $ParentVHD
     [System.Boolean] $UseDifferencingDisk = $true
     [System.String] $AdministratorPassword
@@ -442,12 +431,8 @@ class LabVM:System.ICloneable {
     [LabOStype] $OSType = [LabOStype]::Server
     [System.String] $UnattendFile
     [System.String] $SetupComplete
-<<<<<<< HEAD:LabBuilder/LabBuilder.psm1
-    [String[]] $Packages
     [ValidateSet("ApplyOnly","ApplyAndMonitor","ApplyAndAutoCorrect")][String] $LCMSetting = 'ApplyAndMonitor'
-=======
     [System.String[]] $Packages
->>>>>>> c22a387fd79c3fde4ea410d92cf1666074537f57:src/LabBuilder.psm1
     [ValidateRange(1,2)][Byte] $Generation = 2
     [ValidateSet("5.0","6.2","7.0","7.1","8.0","254.0","255.0")][System.String] $Version = '8.0'
     [System.Int32] $BootOrder
